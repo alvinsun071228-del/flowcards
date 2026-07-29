@@ -17,7 +17,7 @@ class FlowCardsApiTests(unittest.TestCase):
         with self.client.get("/") as response:
             self.assertEqual(response.status_code, 200)
             self.assertIn(b"FlowCards", response.data)
-            self.assertIn(b"DeepSeek V4 Flash", response.data)
+            self.assertIn(b"DeepSeek V4 Pro", response.data)
 
     def test_rejects_short_topic(self):
         response = self.client.post(
@@ -84,7 +84,7 @@ class FlowCardsApiTests(unittest.TestCase):
         self.assertEqual(body["cards"][0]["question"], "What is photosynthesis?")
 
         sent_request = mock_post.call_args.kwargs
-        self.assertEqual(sent_request["json"]["model"], "deepseek-v4-flash")
+        self.assertEqual(sent_request["json"]["model"], "deepseek-v4-pro")
         self.assertEqual(sent_request["json"]["response_format"], {"type": "json_object"})
         self.assertEqual(sent_request["json"]["temperature"], 0.2)
         self.assertEqual(sent_request["json"]["max_tokens"], 6_000)

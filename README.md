@@ -2,8 +2,9 @@
 
 FlowCards is a Flask flashcard application that can generate study decks from
 a topic, pasted notes, or uploaded TXT, Markdown, CSV, JSON, PDF, and DOCX
-files. DeepSeek generates a summary, knowledge points, and question-and-answer
-cards. Decks and study progress persist in browser localStorage.
+files. DeepSeek V4 Pro generates a summary, knowledge points, and
+question-and-answer cards by default. Decks and study progress persist in
+browser localStorage.
 
 ## Features
 

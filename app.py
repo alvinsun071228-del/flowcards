@@ -15,7 +15,7 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 1_000_000
 
 DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions"
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
 REQUEST_TIMEOUT_SECONDS = 60
 MAX_SOURCE_CHARACTERS = 60_000
 MAX_PROMPT_CHARACTERS = 4_000
