@@ -140,7 +140,6 @@ img, svg { display: block; max-width: 100%; }
   transform-origin: top;
   z-index: 99999;
   pointer-events: none;
-  will-change: transform;
 }
 #theme-curtain.falling {
   transform: scaleY(1);
@@ -7092,7 +7091,13 @@ function showToast(message, type = '') {
     }
     if (curtainTimeline) curtainTimeline.kill();
     curtain.style.background = next === 'dark' ? '#0e0f11' : '#f3f4f1';
-    curtainTimeline = gsap.timeline({ defaults: { ease: 'power3.inOut' } });
+    curtainTimeline = gsap.timeline({
+      defaults: { ease: 'power3.inOut' },
+      onComplete: () => {
+        gsap.set(curtain, { clearProps: 'all' });
+        curtain.style.background = '';
+      },
+    });
     curtainTimeline
       .set(curtain, { scaleY: 0, transformOrigin: 'top' })
       .to(curtain, { scaleY: 1, duration: 0.28 })
