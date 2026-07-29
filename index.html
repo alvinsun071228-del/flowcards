@@ -6044,8 +6044,16 @@ async function requestStudioGeneration(payload) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    if (!response.ok) throw new Error(`AI request failed with status ${response.status}.`);
-    const result = await response.json();
+    let result = null;
+    try {
+      result = await response.json();
+    } catch (_error) {
+      // Preserve the HTTP status fallback when the hosting platform returns HTML.
+    }
+    if (!response.ok) {
+      throw new Error(result?.error || `AI request failed with status ${response.status}.`);
+    }
+    if (!result) throw new Error('The AI server returned an unreadable response.');
     const cards = Array.isArray(result.cards) ? result.cards.map(card => ({
       question: String(card.question || card.front || '').trim(),
       answer: String(card.answer || card.back || '').trim(),
