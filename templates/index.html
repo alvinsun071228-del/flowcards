@@ -3848,6 +3848,59 @@ body:has(#view-landing.active) .icon-btn:hover {
   }
 }
 
+/* ============================================================
+   FLOATING HEADER — expands on intent, compacts while scrolling
+   ============================================================ */
+.site-header {
+  top: max(10px, calc(env(safe-area-inset-top, 0px) + 8px));
+  left: clamp(12px, 2vw, 24px);
+  right: clamp(12px, 2vw, 24px);
+  width: auto;
+  height: 72px;
+  min-height: 0;
+  padding: 0 clamp(18px, 3vw, 34px);
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent) !important;
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--color-surface) 84%, transparent) !important;
+  box-shadow: 0 14px 34px rgba(0,0,0,0.10), 0 1px 0 rgba(255,255,255,0.10) inset;
+  backdrop-filter: blur(22px) saturate(1.18);
+  -webkit-backdrop-filter: blur(22px) saturate(1.18);
+  transform-origin: 50% 0;
+  will-change: transform;
+}
+body:not(:has(#view-landing.active)) .site-header,
+body:has(#view-landing.active) .site-header {
+  background: color-mix(in srgb, var(--color-surface) 84%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent) !important;
+}
+body:not(:has(#view-landing.active)) .main-content {
+  padding-top: 104px;
+}
+body:not(:has(#view-landing.active)) .flow-progress-strip {
+  top: 92px;
+  left: clamp(18px, 3vw, 34px);
+  right: clamp(18px, 3vw, 34px);
+  border-radius: 999px;
+  overflow: hidden;
+}
+@media (max-width: 760px) {
+  .site-header,
+  body:not(:has(#view-landing.active)) .site-header,
+  body:has(#view-landing.active) .site-header {
+    left: 10px;
+    right: 10px;
+    height: 60px;
+    padding: 0 14px;
+    border-radius: 20px;
+  }
+  body:not(:has(#view-landing.active)) .main-content { padding-top: 86px; }
+  body:not(:has(#view-landing.active)) .flow-progress-strip {
+    top: 78px;
+    left: 16px;
+    right: 16px;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -7358,6 +7411,92 @@ function initLandingMotion() {
   });
 }
 
+let floatingHeaderCleanup = null;
+
+function initFloatingHeader() {
+  if (floatingHeaderCleanup) floatingHeaderCleanup();
+  const header = document.querySelector('.site-header');
+  if (!header || !window.gsap) return;
+
+  let compact = false;
+  let lastY = Math.max(0, window.scrollY);
+  let frame = 0;
+  let idleTimer = 0;
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function setHeaderState(nextCompact, force = false, reason = 'programmatic') {
+    if (!force && compact === nextCompact) return;
+    compact = nextCompact;
+    header.dataset.scrollState = compact ? 'compact' : 'expanded';
+    header.dataset.scrollTrigger = reason;
+    const mobile = window.innerWidth <= 760;
+    const vars = compact
+      ? { scaleX: mobile ? 0.78 : 0.72, scaleY: 0.78, y: -2 }
+      : { scaleX: 1, scaleY: 1, y: 0 };
+
+    if (reduceMotion) {
+      gsap.set(header, vars);
+      return;
+    }
+    gsap.to(header, {
+      ...vars,
+      duration: compact ? 0.28 : 0.42,
+      ease: compact ? 'power2.out' : 'power3.out',
+      overwrite: 'auto',
+    });
+  }
+
+  function expandHeader() {
+    clearTimeout(idleTimer);
+    setHeaderState(false, false, 'intent');
+  }
+
+  function scheduleIdleExpand() {
+    clearTimeout(idleTimer);
+    idleTimer = window.setTimeout(() => setHeaderState(false, false, 'idle'), 1200);
+  }
+
+  function updateFromScroll() {
+    frame = 0;
+    const currentY = Math.max(0, window.scrollY);
+    const delta = currentY - lastY;
+
+    if (currentY <= 40 || delta < -0.5) {
+      setHeaderState(false, false, currentY <= 40 ? 'top' : 'up');
+    } else if (currentY > 88 && delta > 0.5) {
+      setHeaderState(true, false, 'down');
+    }
+    lastY = currentY;
+  }
+
+  function onScroll() {
+    scheduleIdleExpand();
+    if (!frame) frame = requestAnimationFrame(updateFromScroll);
+  }
+
+  function onResize() {
+    setHeaderState(compact, true, 'resize');
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onResize, { passive: true });
+  header.addEventListener('pointerenter', expandHeader);
+  header.addEventListener('pointerdown', expandHeader);
+  header.addEventListener('focusin', expandHeader);
+  header.dataset.scrollState = 'expanded';
+
+  floatingHeaderCleanup = () => {
+    clearTimeout(idleTimer);
+    if (frame) cancelAnimationFrame(frame);
+    window.removeEventListener('scroll', onScroll);
+    window.removeEventListener('resize', onResize);
+    header.removeEventListener('pointerenter', expandHeader);
+    header.removeEventListener('pointerdown', expandHeader);
+    header.removeEventListener('focusin', expandHeader);
+    gsap.set(header, { clearProps: 'transform' });
+  };
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   gsap.registerPlugin(ScrollTrigger);
   lucide.createIcons();
@@ -7370,6 +7509,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   } catch(e) {}
   initLandingMotion();
+  initFloatingHeader();
 });
 
 // ============================================================
