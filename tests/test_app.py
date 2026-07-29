@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 
 os.environ.setdefault("DEEPSEEK_API_KEY", "test-key")
 
-from app import app  # noqa: E402
+from app import app, parse_deepseek_result  # noqa: E402
 
 
 class FlowCardsApiTests(unittest.TestCase):
@@ -86,8 +86,47 @@ class FlowCardsApiTests(unittest.TestCase):
         sent_request = mock_post.call_args.kwargs
         self.assertEqual(sent_request["json"]["model"], "deepseek-v4-flash")
         self.assertEqual(sent_request["json"]["response_format"], {"type": "json_object"})
+        self.assertEqual(sent_request["json"]["temperature"], 0.2)
         self.assertEqual(sent_request["json"]["max_tokens"], 6_000)
         self.assertNotIn("test-key", str(sent_request["json"]))
+        system_prompt = sent_request["json"]["messages"][0]["content"]
+        self.assertIn("genuine, grammatically complete question", system_prompt)
+        self.assertIn("Return fewer cards instead of padding", system_prompt)
+        self.assertIn("fun facts", system_prompt)
+
+    def test_filters_trivia_statements_and_duplicate_questions(self):
+        result = parse_deepseek_result(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": (
+                                '{"deckName":"Biology","summary":"Core ideas.",'
+                                '"knowledgePoints":["Energy conversion"],'
+                                '"cards":['
+                                '{"question":"Photosynthesis converts light energy.",'
+                                '"answer":"This is a statement, not a question."},'
+                                '{"question":"Did you know plants make sugar?",'
+                                '"answer":"This is trivia framing."},'
+                                '{"question":"What is photosynthesis?",'
+                                '"answer":"It converts light energy into chemical energy."},'
+                                '{"question":"What is photosynthesis?",'
+                                '"answer":"Duplicate wording."},'
+                                '{"question":"光合作用为什么重要",'
+                                '"answer":"它把光能转化为化学能。"}'
+                                ']}'
+                            )
+                        }
+                    }
+                ]
+            },
+            requested_count=5,
+        )
+
+        self.assertEqual(
+            [card["question"] for card in result["cards"]],
+            ["What is photosynthesis?", "光合作用为什么重要？"],
+        )
 
 
 if __name__ == "__main__":

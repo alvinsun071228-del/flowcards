@@ -5850,27 +5850,29 @@ function studioQuestionFromSentence(sentence, index) {
       subject = subject.charAt(0).toLowerCase() + subject.slice(1);
     }
     const verb = action[2].toLowerCase();
+    const pluralSubject = /s$/i.test(subject) && !/ss$|sis$/i.test(subject)
+      || /^(stomata|bacteria|criteria|data|people)\b/i.test(subject);
+    const auxiliary = pluralSubject ? 'do' : 'does';
     let question = `What should you know about ${subject}?`;
     if (['is', 'are', 'means', 'refers to'].includes(verb)) question = `What is ${subject}?`;
     if (['occurs', 'occur'].includes(verb)) {
-      const pluralSubject = /s$/i.test(subject) && !/ss$|sis$/i.test(subject);
-      question = `Where ${pluralSubject ? 'do' : 'does'} ${subject} occur?`;
+      question = `Where ${auxiliary} ${subject} occur?`;
     }
     if (verb === 'began') question = `Where and when did ${subject} begin?`;
-    if (['explains', 'explain'].includes(verb)) question = `What does ${subject} explain?`;
-    if (['converts', 'convert', 'transfers', 'transfer'].includes(verb)) question = `What does ${subject} do?`;
-    if (['uses', 'use'].includes(verb)) question = `What does ${subject} use?`;
-    if (['produces', 'produce'].includes(verb)) question = `What does ${subject} produce?`;
-    if (['supplies', 'supply'].includes(verb)) question = `What does ${subject} supply?`;
-    if (['regulates', 'regulate'].includes(verb)) question = `What does ${subject} regulate?`;
-    if (['absorbs', 'absorb'].includes(verb)) question = `What does ${subject} absorb?`;
-    if (['stores', 'store'].includes(verb)) question = `What does ${subject} store?`;
-    if (['releases', 'release'].includes(verb)) question = `What does ${subject} release?`;
-    if (['moves', 'move'].includes(verb)) question = `What does ${subject} move?`;
+    if (['explains', 'explain'].includes(verb)) question = `What ${auxiliary} ${subject} explain?`;
+    if (['converts', 'convert', 'transfers', 'transfer'].includes(verb)) question = `What ${auxiliary} ${subject} do?`;
+    if (['uses', 'use'].includes(verb)) question = `What ${auxiliary} ${subject} use?`;
+    if (['produces', 'produce'].includes(verb)) question = `What ${auxiliary} ${subject} produce?`;
+    if (['supplies', 'supply'].includes(verb)) question = `What ${auxiliary} ${subject} supply?`;
+    if (['regulates', 'regulate'].includes(verb)) question = `What ${auxiliary} ${subject} regulate?`;
+    if (['absorbs', 'absorb'].includes(verb)) question = `What ${auxiliary} ${subject} absorb?`;
+    if (['stores', 'store'].includes(verb)) question = `What ${auxiliary} ${subject} store?`;
+    if (['releases', 'release'].includes(verb)) question = `What ${auxiliary} ${subject} release?`;
+    if (['moves', 'move'].includes(verb)) question = `What ${auxiliary} ${subject} move?`;
     if (['changes', 'change'].includes(verb)) question = `What change happens during ${subject}?`;
-    if (['returns', 'return'].includes(verb)) question = `What does ${subject} return?`;
-    if (['gathers', 'gather'].includes(verb)) question = `Where does ${subject} gather?`;
-    if (['drives', 'drive'].includes(verb)) question = `What does ${subject} drive?`;
+    if (['returns', 'return'].includes(verb)) question = `What ${auxiliary} ${subject} return?`;
+    if (['gathers', 'gather'].includes(verb)) question = `Where ${auxiliary} ${subject} gather?`;
+    if (['drives', 'drive'].includes(verb)) question = `What ${auxiliary} ${subject} drive?`;
     return { question, answer: sentence };
   }
 
@@ -5880,7 +5882,7 @@ function studioQuestionFromSentence(sentence, index) {
     .filter(word => word.length > 3 && !['that', 'this', 'with', 'from', 'into', 'their', 'about', 'which'].includes(word.toLowerCase()));
   const focus = words.slice(0, 5).join(' ') || `knowledge point ${index + 1}`;
   return {
-    question: `What is the key idea involving ${focus}?`,
+    question: `What key fact does the source explain about ${focus}?`,
     answer: sentence,
   };
 }
@@ -5950,44 +5952,16 @@ function knownTopicContent(prompt) {
 
 function localTopicGeneration(prompt, count) {
   const known = knownTopicContent(prompt);
+  if (!known) {
+    throw new Error(
+      'The static preview cannot create accurate cards for this topic. Start the Flask app to use the real DeepSeek generator.'
+    );
+  }
   const title = known?.title || studioTitleFromPrompt(prompt);
-  const points = known?.points || [
-    `Define the central idea of ${title} in one concise statement.`,
-    `Identify the most important components or categories within ${title}.`,
-    `Explain the main process or sequence associated with ${title}.`,
-    `Connect ${title} to a concrete example or real-world application.`,
-    `Compare ${title} with a closely related concept.`,
-    `Name a common misconception about ${title} and correct it.`,
-    `Explain why ${title} matters within the larger subject.`,
-    `Describe how a learner could check their understanding of ${title}.`,
-    `Identify the vocabulary needed to discuss ${title} accurately.`,
-    `Summarize ${title} as if teaching it to a beginner.`,
-    `Describe a cause-and-effect relationship within ${title}.`,
-    `Create one exam-style application of ${title}.`,
-  ];
-  const selected = Array.from({ length: count }, (_, index) => points[index % points.length]);
+  const points = known.points;
+  const selected = points.slice(0, count);
   const cards = selected.map((point, index) => {
-    if (known) {
-      const baseCard = studioQuestionFromSentence(point, index);
-      const round = Math.floor(index / points.length);
-      if (round === 0) return baseCard;
-      const focus = point.split(/\s+/).slice(0, 7).join(' ').replace(/[.,;:]$/, '');
-      const variants = [
-        `Explain this idea in your own words: ${focus}.`,
-        `Why is this point important for understanding ${title}?`,
-        `How could this idea appear in an assessment about ${title}?`,
-        `How does this point connect to the larger topic of ${title}?`,
-      ];
-      return {
-        question: variants[(round - 1) % variants.length],
-        answer: point,
-      };
-    }
-    const verbs = ['Define', 'Identify', 'Explain', 'Apply', 'Compare', 'Correct', 'Connect', 'Check', 'Name', 'Teach', 'Analyze', 'Practice'];
-    return {
-      question: `${verbs[index % verbs.length]}: ${title}`,
-      answer: point,
-    };
+    return studioQuestionFromSentence(point, index);
   });
   return {
     deckName: title,
@@ -6004,30 +5978,13 @@ function localSourceGeneration(source, count, deckName) {
   if (!sentences.length) {
     throw new Error('Add more readable text before generating cards.');
   }
-  const selected = count <= sentences.length
-    ? evenlySelect(sentences, count)
-    : Array.from({ length: count }, (_, index) => sentences[index % sentences.length]);
+  const selected = evenlySelect(sentences, Math.min(count, sentences.length));
   const summarySource = evenlySelect(sentences, Math.min(3, sentences.length));
   return {
     deckName,
     summary: summarySource.join(' '),
     knowledgePoints: selected.slice(0, Math.min(6, selected.length)),
-    cards: selected.map((sentence, index) => {
-      const baseCard = studioQuestionFromSentence(sentence, index);
-      const round = Math.floor(index / sentences.length);
-      if (round === 0) return baseCard;
-      const focus = sentence.split(/\s+/).slice(0, 7).join(' ').replace(/[.,;:]$/, '');
-      const variants = [
-        `Explain this source idea in your own words: ${focus}.`,
-        `Why does this source point matter: ${focus}?`,
-        `What example could illustrate this idea: ${focus}?`,
-        `How does this point connect to the rest of ${deckName}?`,
-      ];
-      return {
-        question: variants[(round - 1) % variants.length],
-        answer: sentence,
-      };
-    }),
+    cards: selected.map((sentence, index) => studioQuestionFromSentence(sentence, index)),
   };
 }
 
