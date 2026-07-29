@@ -139,18 +139,33 @@ img, svg { display: block; max-width: 100%; }
 #theme-curtain {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: var(--color-bg);
-  clip-path: inset(0 0 100% 0);
   z-index: 99999;
   pointer-events: none;
+  overflow: hidden;
+  visibility: hidden;
 }
-#theme-curtain.falling {
-  clip-path: inset(0 0 0 0);
-  transition: clip-path 550ms cubic-bezier(0.76, 0, 0.24, 1);
+.theme-sweep {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  will-change: transform;
 }
-#theme-curtain.rising {
-  clip-path: inset(100% 0 0 0);
-  transition: clip-path 550ms cubic-bezier(0.76, 0, 0.24, 1);
+.theme-sweep-glow {
+  position: absolute;
+  top: -64px;
+  left: 0;
+  width: 100%;
+  height: 128px;
+  opacity: 0;
+}
+.theme-sweep-line {
+  position: absolute;
+  inset: 0;
+  height: 1px;
+  background: #c8ff3d;
+  box-shadow: 0 0 10px rgba(200,255,61,0.75), 0 0 28px rgba(200,255,61,0.28);
 }
 [data-theme-toggle] {
   transition: transform 0.15s ease, background 0.3s ease, color 0.3s ease;
@@ -3833,7 +3848,12 @@ body:has(#view-landing.active) .icon-btn:hover {
 </head>
 <body>
 <!-- Theme curtain overlay -->
-<div id="theme-curtain" aria-hidden="true"></div>
+<div id="theme-curtain" aria-hidden="true">
+  <div class="theme-sweep">
+    <div class="theme-sweep-glow"></div>
+    <div class="theme-sweep-line"></div>
+  </div>
+</div>
 
 <!-- FIXED HEADER -->
 <header class="site-header">
@@ -7146,32 +7166,57 @@ function showToast(message, type = '') {
   }
 
   const curtain = document.getElementById('theme-curtain');
+  const sweep = curtain?.querySelector('.theme-sweep');
+  const sweepGlow = curtain?.querySelector('.theme-sweep-glow');
+  const sweepLine = curtain?.querySelector('.theme-sweep-line');
   let curtainTimeline = null;
   applyTheme(d);
 
   document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
     const next = d === 'dark' ? 'light' : 'dark';
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const isIOSWebKit = /iPad|iPhone|iPod/.test(navigator.userAgent)
-      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    if (!curtain || !window.gsap || reduceMotion || isIOSWebKit) {
+    const button = document.querySelector('[data-theme-toggle]');
+    if (!curtain || !sweep || !sweepGlow || !sweepLine || !window.gsap || reduceMotion) {
       applyTheme(next);
       return;
     }
-    if (curtainTimeline) curtainTimeline.kill();
-    curtain.style.background = next === 'dark' ? '#0e0f11' : '#f3f4f1';
+    if (curtainTimeline) {
+      curtainTimeline.kill();
+      gsap.set([curtain, sweep, sweepGlow, sweepLine, button], { clearProps: 'all' });
+    }
+
+    const nextColor = next === 'dark' ? '#0e0f11' : '#f3f4f1';
+    const travel = Math.max(window.innerHeight, document.documentElement.clientHeight) + 80;
+    sweepGlow.style.background =
+      `linear-gradient(to bottom, transparent, ${nextColor} 50%, transparent)`;
+
     curtainTimeline = gsap.timeline({
-      defaults: { ease: 'power3.inOut' },
+      defaults: { ease: 'power1.inOut' },
       onComplete: () => {
-        gsap.set(curtain, { clearProps: 'all' });
-        curtain.style.background = '';
+        gsap.set([curtain, sweep, sweepGlow, sweepLine, button], { clearProps: 'all' });
       },
     });
     curtainTimeline
-      .set(curtain, { clipPath: 'inset(0 0 100% 0)' })
-      .to(curtain, { clipPath: 'inset(0 0 0 0)', duration: 0.28 })
-      .add(() => applyTheme(next))
-      .to(curtain, { clipPath: 'inset(100% 0 0 0)', duration: 0.32 });
+      .addLabel('sweep', 0)
+      .set(curtain, { autoAlpha: 1 }, 'sweep')
+      .set(sweep, { y: -72 }, 'sweep')
+      .set(sweepLine, { autoAlpha: 0, scaleX: 0.12, transformOrigin: '50% 50%' }, 'sweep')
+      .set(sweepGlow, { autoAlpha: 0 }, 'sweep')
+      .to(sweepLine, { autoAlpha: 1, scaleX: 1, duration: 0.16, ease: 'power2.out' }, 'sweep')
+      .to(sweepGlow, { autoAlpha: 0.72, duration: 0.18, ease: 'sine.out' }, 'sweep')
+      .to(sweep, { y: travel, duration: 0.72 }, 'sweep+=0.04')
+      .to(button, {
+        rotation: next === 'dark' ? -180 : 180,
+        scale: 0.9,
+        duration: 0.24,
+      }, 'sweep+=0.16')
+      .add(() => applyTheme(next), 'sweep+=0.38')
+      .to(button, { scale: 1, duration: 0.28, ease: 'power2.out' }, 'sweep+=0.38')
+      .to([sweepLine, sweepGlow], {
+        autoAlpha: 0,
+        duration: 0.16,
+        ease: 'sine.out',
+      }, 'sweep+=0.62');
   });
 })();
 
