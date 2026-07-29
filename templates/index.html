@@ -260,18 +260,31 @@ input { font: inherit; color: inherit; }
 }
 
 /* === Flashcard image === */
+.fc-card-body {
+  display: flex;
+  flex-direction: row;
+  gap: 14px;
+  align-items: flex-start;
+}
+.fc-card-text {
+  flex: 1;
+  min-width: 0;
+}
+.fc-card-image-wrap {
+  flex-shrink: 0;
+  width: 140px;
+}
 .fc-image {
   width: 100%;
-  max-height: 180px;
+  max-height: 160px;
   object-fit: contain;
   border-radius: 8px;
-  margin-top: 10px;
   background: var(--color-surface-2);
 }
 .fc-image-credit {
-  font-size: 0.58rem;
+  font-size: 0.55rem;
   color: var(--color-text-faint);
-  margin-top: 3px;
+  margin-top: 2px;
   text-align: right;
 }
 .fc-image-credit a {
@@ -281,16 +294,29 @@ input { font: inherit; color: inherit; }
 }
 
 /* === Generated card with image === */
+.generated-card.with-image {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  align-items: flex-start;
+}
+.generated-card-text {
+  flex: 1;
+  min-width: 0;
+}
+.generated-card-image-wrap {
+  flex-shrink: 0;
+  width: 130px;
+}
 .generated-card-image {
   width: 100%;
   max-height: 140px;
   object-fit: contain;
   border-radius: 7px;
-  margin-top: 7px;
   background: var(--color-surface-2);
 }
 .generated-image-credit {
-  font-size: 0.56rem;
+  font-size: 0.53rem;
   color: var(--color-text-faint);
   margin-top: 2px;
   text-align: right;
@@ -301,16 +327,30 @@ input { font: inherit; color: inherit; }
 }
 
 /* === Quiz card image === */
+.quiz-card-top {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: var(--space-4);
+}
+.quiz-card-text {
+  flex: 1;
+  min-width: 0;
+}
+.quiz-card-image-wrap {
+  flex-shrink: 0;
+  width: 160px;
+}
 .quiz-card-image {
   width: 100%;
   max-height: 200px;
   object-fit: contain;
   border-radius: 8px;
-  margin-top: 10px;
   background: var(--color-surface-2);
 }
 .quiz-image-credit {
-  font-size: 0.58rem;
+  font-size: 0.55rem;
   color: var(--color-text-faint);
   margin-top: 3px;
   text-align: right;
@@ -1550,6 +1590,9 @@ body:not(:has(#view-landing.active)) .toast { color: var(--color-text); backgrou
     min-height: 320px;
   }
   .flow-section-inner { padding: 56px var(--space-4) var(--space-4); }
+  .fc-card-body, .generated-card.with-image, .quiz-card-top { flex-direction: column; }
+  .fc-card-image-wrap, .generated-card-image-wrap, .quiz-card-image-wrap { width: 100%; }
+  .fc-image, .generated-card-image, .quiz-card-image { max-height: 120px; }
 }
 
 /* ============================================================
@@ -6630,9 +6673,11 @@ function resetEstimateBtn(btn, _btnId) {
 function buildImageHTML(image) {
   if (!image || !image.url) return '';
   return `
-    <img class="fc-image" src="${escapeHTML(image.url)}" alt="${escapeHTML(image.alt || '')}" loading="lazy">
-    <div class="fc-image-credit">
-      <a href="${escapeHTML(image.sourceUrl || '#')}" target="_blank" rel="noopener">${escapeHTML(image.credit || 'Wikimedia Commons')}</a>
+    <div class="fc-card-image-wrap">
+      <img class="fc-image" src="${escapeHTML(image.url)}" alt="${escapeHTML(image.alt || '')}" loading="lazy">
+      <div class="fc-image-credit">
+        <a href="${escapeHTML(image.sourceUrl || '#')}" target="_blank" rel="noopener">${escapeHTML(image.credit || 'Wikimedia Commons')}</a>
+      </div>
     </div>
   `;
 }
@@ -6640,9 +6685,11 @@ function buildImageHTML(image) {
 function buildGeneratedImageHTML(image) {
   if (!image || !image.url) return '';
   return `
-    <img class="generated-card-image" src="${escapeHTML(image.url)}" alt="${escapeHTML(image.alt || '')}" loading="lazy">
-    <div class="generated-image-credit">
-      <a href="${escapeHTML(image.sourceUrl || '#')}" target="_blank" rel="noopener">${escapeHTML(image.credit || 'Wikimedia Commons')}</a>
+    <div class="generated-card-image-wrap">
+      <img class="generated-card-image" src="${escapeHTML(image.url)}" alt="${escapeHTML(image.alt || '')}" loading="lazy">
+      <div class="generated-image-credit">
+        <a href="${escapeHTML(image.sourceUrl || '#')}" target="_blank" rel="noopener">${escapeHTML(image.credit || 'Wikimedia Commons')}</a>
+      </div>
     </div>
   `;
 }
@@ -6650,9 +6697,11 @@ function buildGeneratedImageHTML(image) {
 function buildQuizImageHTML(image) {
   if (!image || !image.url) return '';
   return `
-    <img class="quiz-card-image" src="${escapeHTML(image.url)}" alt="${escapeHTML(image.alt || '')}" loading="lazy">
-    <div class="quiz-image-credit">
-      <a href="${escapeHTML(image.sourceUrl || '#')}" target="_blank" rel="noopener">${escapeHTML(image.credit || 'Wikimedia Commons')}</a>
+    <div class="quiz-card-image-wrap">
+      <img class="quiz-card-image" src="${escapeHTML(image.url)}" alt="${escapeHTML(image.alt || '')}" loading="lazy">
+      <div class="quiz-image-credit">
+        <a href="${escapeHTML(image.sourceUrl || '#')}" target="_blank" rel="noopener">${escapeHTML(image.credit || 'Wikimedia Commons')}</a>
+      </div>
     </div>
   `;
 }
@@ -6677,8 +6726,10 @@ function renderStudioResults() {
   `).join('');
   cards.innerHTML = studioState.generatedCards.map((card, index) => `
     <article class="generated-card${card.image ? ' with-image' : ''}">
-      <div class="generated-question">${index + 1}. ${escapeHTML(card.question)}</div>
-      <div class="generated-answer">${escapeHTML(card.answer)}</div>
+      <div class="generated-card-text">
+        <div class="generated-question">${index + 1}. ${escapeHTML(card.question)}</div>
+        <div class="generated-answer">${escapeHTML(card.answer)}</div>
+      </div>
       ${buildGeneratedImageHTML(card.image)}
     </article>
   `).join('');
@@ -7285,8 +7336,12 @@ function buildCardHTML(card, i, total) {
               <span class="fc-pos-badge">${card.partOfSpeech || 'word'}</span>
               <span class="fc-status-dot ${p.status === 'new' ? '' : p.status}" title="${p.status}"></span>
             </div>
-            <div class="fc-word">${card.word}</div>
-            ${buildImageHTML(card.image)}
+            <div class="fc-card-body">
+              <div class="fc-card-text">
+                <div class="fc-word">${card.word}</div>
+              </div>
+              ${buildImageHTML(card.image)}
+            </div>
             <div class="fc-tap-hint">
               <i data-lucide="rotate-cw" width="12" height="12"></i>
               <span>tap or press Enter to reveal</span>
@@ -7525,9 +7580,13 @@ function renderQuizQuestion() {
   const body = document.getElementById('quizBody');
   body.innerHTML = `
     <div class="quiz-card">
-      <div class="quiz-question-label">${isWordToTranslation ? 'What does this word mean?' : 'Which word matches this definition?'}</div>
-      <div class="quiz-question">${questionText}</div>
-      ${buildQuizImageHTML(q.image)}
+      <div class="quiz-card-top">
+        <div class="quiz-card-text">
+          <div class="quiz-question-label">${isWordToTranslation ? 'What does this word mean?' : 'Which word matches this definition?'}</div>
+          <div class="quiz-question">${questionText}</div>
+        </div>
+        ${buildQuizImageHTML(q.image)}
+      </div>
       <div class="quiz-choices">
         ${choices.map((c, i) => {
           const choiceText = isWordToTranslation ? c.translation : c.word;
