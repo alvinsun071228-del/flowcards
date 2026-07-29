@@ -6651,18 +6651,22 @@ function renderFlow(deckId) {
     return;
   }
 
-  // Build one DOM section per card; only one is visible at a time.
-  sorted.forEach((card, i) => {
-    const sec = document.createElement('div');
-    sec.className = 'flow-step' + (i === 0 ? ' active' : '');
-    sec.dataset.cardId = card.id;
-    sec.id = `flow-sec-${card.id}`;
-    sec.innerHTML = buildCardHTML(card, i, sorted.length);
-    wrapper.appendChild(sec);
-  });
+  // Keep only the active card in the DOM. Large decks previously created
+  // thousands of hidden elements and SVG icons, which could stall mobile Safari.
+  wrapper.appendChild(createFlowStep(sorted[0], 0, sorted.length, true));
 
   updateFlowProgress();
   lucide.createIcons();
+}
+
+function createFlowStep(card, index, total, active = false) {
+  const sec = document.createElement('div');
+  sec.className = 'flow-step' + (active ? ' active' : '');
+  sec.dataset.cardId = card.id;
+  sec.dataset.cardIndex = index;
+  sec.id = `flow-sec-${card.id}`;
+  sec.innerHTML = buildCardHTML(card, index, total);
+  return sec;
 }
 
 function buildCardHTML(card, i, total) {
@@ -6733,17 +6737,18 @@ function flowGoto(newIndex) {
 
   flowState.locked = true;
   const wrapper = document.getElementById('flowArtWrapper');
-  const steps = wrapper.querySelectorAll('.flow-step');
   const direction = newIndex > flowState.index ? 'down' : 'up';
-  const oldEl = steps[flowState.index];
-  const newEl = steps[newIndex];
-  if (!newEl) { flowState.locked = false; return; }
+  const oldEl = wrapper.querySelector('.flow-step.active');
+  const card = flowState.cards[newIndex];
+  if (!oldEl || !card) { flowState.locked = false; return; }
+  const newEl = createFlowStep(card, newIndex, flowState.cards.length);
+  newEl.classList.add(direction === 'down' ? 'enter-from-down' : 'enter-from-up');
+  wrapper.appendChild(newEl);
+  lucide.createIcons();
 
   // Animate out old, animate in new.
   oldEl.classList.remove('active');
   oldEl.classList.add(direction === 'down' ? 'leave-up' : 'leave-down');
-  newEl.classList.remove('leave-up','leave-down');
-  newEl.classList.add(direction === 'down' ? 'enter-from-down' : 'enter-from-up');
   // force reflow then activate
   void newEl.offsetHeight;
   newEl.classList.add('active');
@@ -6753,7 +6758,7 @@ function flowGoto(newIndex) {
   updateFlowProgress();
 
   setTimeout(() => {
-    oldEl.classList.remove('leave-up','leave-down');
+    oldEl.remove();
     flowState.locked = false;
   }, 540);
 }
