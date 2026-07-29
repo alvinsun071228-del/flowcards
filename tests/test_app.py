@@ -254,5 +254,153 @@ class FlowCardsApiTests(unittest.TestCase):
         )
 
 
+    def test_estimate_endpoint_returns_count(self):
+        with patch("app.requests.post") as mock_post:
+            mock_response = Mock()
+            mock_response.ok = True
+            mock_response.json.return_value = {
+                "choices": [{"message": {"content": '{"estimatedCount":42,"reasoning":"Medium scope."}'}}]
+            }
+            mock_post.return_value = mock_response
+
+            response = self.client.post(
+                "/api/estimate",
+                json={"prompt": "comprehensive calculus review for final exam"},
+            )
+
+            self.assertEqual(response.status_code, 200)
+            body = response.get_json()
+            self.assertEqual(body["estimatedCount"], 42)
+            self.assertIn("reasoning", body)
+
+    def test_estimate_rejects_empty_payload(self):
+        response = self.client.post("/api/estimate", json={})
+        self.assertEqual(response.status_code, 400)
+
+    def test_rate_limit_enforced(self):
+        import app as app_module
+        app_module._request_times.clear()
+
+        for _ in range(11):
+            response = self.client.post(
+                "/api/generate",
+                json={
+                    "mode": "topic",
+                    "prompt": "Create a test deck about math.",
+                    "sourceText": "",
+                    "deckName": "Math",
+                    "count": 5,
+                    "includeImages": False,
+                },
+            )
+        # The 11th request should be rate limited
+        self.assertEqual(response.status_code, 429)
+        app_module._request_times.clear()
+
+    @patch("app.requests.post")
+    def test_include_images_flow(self, mock_post):
+        deepseek_response = Mock()
+        deepseek_response.ok = True
+        deepseek_response.status_code = 200
+        deepseek_response.json.return_value = {
+            "choices": [{"message": {"content": (
+                '{"deckName":"Heart","summary":"Heart anatomy.",'
+                '"knowledgePoints":["Four chambers"],'
+                '"cards":[{"question":"What are the heart chambers?",'
+                '"answer":"RA, RV, LA, LV.","imageQuery":"human heart diagram labeled"}]}'
+            )}}]
+        }
+        mock_post.return_value = deepseek_response
+
+        with patch("app.search_wikimedia_image") as mock_search:
+            mock_search.return_value = {
+                "url": "https://upload.wikimedia.org/example.jpg",
+                "sourceUrl": "https://commons.wikimedia.org/wiki/File:Example",
+                "alt": "Heart diagram",
+                "credit": "Public domain",
+            }
+
+            response = self.client.post(
+                "/api/generate",
+                json={
+                    "mode": "topic",
+                    "prompt": "human heart anatomy",
+                    "sourceText": "",
+                    "deckName": "Heart",
+                    "count": 5,
+                    "includeImages": True,
+                },
+            )
+
+            self.assertEqual(response.status_code, 200)
+            body = response.get_json()
+            card = body["cards"][0]
+            self.assertIn("image", card)
+            self.assertEqual(card["image"]["url"], "https://upload.wikimedia.org/example.jpg")
+            self.assertEqual(card["image"]["alt"], "Heart diagram")
+            # Verify image search was called with the query
+            mock_search.assert_called_once_with("human heart diagram labeled")
+
+    @patch("app.requests.post")
+    def test_images_not_included_when_toggle_off(self, mock_post):
+        mock_response = Mock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": (
+                '{"deckName":"Test","summary":"T.","knowledgePoints":[],'
+                                '"cards":[{"question":"What is the test asking?","answer":"This is the answer.","imageQuery":"test"}]}'
+            )}}]
+        }
+        mock_post.return_value = mock_response
+
+        response = self.client.post(
+            "/api/generate",
+            json={
+                "mode": "topic",
+                "prompt": "test topic for making flashcards",
+                "sourceText": "",
+                "deckName": "Test",
+                "count": 3,
+                "includeImages": False,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertNotIn("image", body["cards"][0])
+
+    def test_rejects_invalid_include_images_type(self):
+        response = self.client.post(
+            "/api/generate",
+            json={
+                "mode": "topic",
+                "prompt": "test topic for flashcards",
+                "sourceText": "",
+                "deckName": "Test",
+                "count": 5,
+                "includeImages": "yes",
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_parse_deepseek_result_with_image_queries(self):
+        result = parse_deepseek_result(
+            {
+                "choices": [{"message": {"content": (
+                    '{"deckName":"DNA","summary":"DNA structure.",'
+                    '"knowledgePoints":["Double helix"],'
+                    '"cards":['
+                    '{"question":"What shape is DNA?","answer":"Double helix.","imageQuery":"DNA double helix diagram"},'
+                    '{"question":"What pairs with adenine?","answer":"Thymine.","imageQuery":"AT base pair"}'
+                    ']}'
+                )}}]
+            },
+            requested_count=5,
+        )
+        self.assertEqual(len(result["cards"]), 2)
+        self.assertEqual(result["cards"][0]["imageQuery"], "DNA double helix diagram")
+        self.assertEqual(result["cards"][1]["imageQuery"], "AT base pair")
+
+
 if __name__ == "__main__":
     unittest.main()

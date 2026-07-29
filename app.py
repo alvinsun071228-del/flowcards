@@ -406,6 +406,10 @@ def enrich_cards_with_images(cards):
 def index():
     return send_from_directory(os.path.dirname(__file__), "index.html")
 
+@app.get("/static/<path:filename>")
+def static_files(filename):
+    return send_from_directory(os.path.join(os.path.dirname(__file__), "static"), filename)
+
 
 @app.get("/api/health")
 def health():

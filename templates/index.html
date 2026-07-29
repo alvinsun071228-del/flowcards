@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" id="themeColorMeta" content="#0e0f11" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="FlowCards" />
+<link rel="manifest" href="/static/manifest.json" />
 <title>FlowCards — Vocabulary Flashcards</title>
 
 <!-- Fonts -->
@@ -562,6 +565,27 @@ body:not(:has(#view-landing.active)) .icon-btn {
   border-radius: 14px;
 }
 .product-heading-action { flex: 0 0 auto; min-height: 44px; }
+.search-wrap { position: relative; flex: 0 0 220px; }
+.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--color-text-muted); pointer-events: none; }
+.search-input {
+  width: 100%; padding: 8px 12px 8px 32px;
+  border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  font-size: 0.78rem; background: var(--color-surface); color: var(--color-text);
+}
+.search-input:focus { outline: none; border-color: var(--color-primary); }
+.search-results {
+  position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px;
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  max-height: 320px; overflow-y: auto; z-index: 100;
+}
+.search-result-item {
+  padding: 10px 12px; border-bottom: 1px solid var(--color-border);
+  font-size: 0.76rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+}
+.search-result-item:last-child { border-bottom: none; }
+.search-result-item:hover { background: var(--color-surface-offset); }
+.search-result-deck { font-size: 0.64rem; color: var(--color-text-muted); }
 body:not(:has(#view-landing.active)) .home-view {
   width: min(100% - 40px, 1240px);
   max-width: none;
@@ -1313,6 +1337,13 @@ body:not(:has(#view-landing.active)) .toast { color: var(--color-text); backgrou
 .fc-status-dot.known   { background: var(--color-success); }
 .fc-status-dot.fuzzy   { background: var(--color-gold); }
 .fc-status-dot.unknown { background: var(--color-error); }
+.fc-edit-btn {
+  opacity: 0.35;
+  transition: opacity var(--transition-interactive);
+  margin-left: auto;
+  margin-right: 6px;
+}
+.fc-edit-btn:hover, .fc-edit-btn:focus-visible { opacity: 1; }
 .fc-word {
   font-family: var(--font-display);
   font-size: var(--text-xl); font-weight: 800;
@@ -1560,6 +1591,19 @@ body:not(:has(#view-landing.active)) .toast { color: var(--color-text); backgrou
 .toast.leaving { animation: toastOut 0.25s ease forwards; }
 .toast.success { border-color: var(--color-success); }
 .toast.error   { border-color: var(--color-error); }
+.toast-undo { display: flex; align-items: center; gap: var(--space-4); padding-right: var(--space-3); }
+.toast-undo-btn {
+  flex-shrink: 0;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.toast-undo-btn:hover { opacity: 0.85; }
 
 /* ============================================================
    BACK BUTTON (on scroll/quiz views)
@@ -4358,6 +4402,20 @@ body:not(:has(#view-landing.active)) .flow-progress-strip {
           <i data-lucide="sparkles" width="16" height="16"></i>
           Create with AI
         </button>
+        <button class="btn btn-ghost product-heading-action" type="button" onclick="exportAllDecks()" title="Export all decks as JSON">
+          <i data-lucide="download" width="16" height="16"></i>
+          Export
+        </button>
+        <button class="btn btn-ghost product-heading-action" type="button" onclick="document.getElementById('importFileInput').click()" title="Import decks from JSON">
+          <i data-lucide="upload" width="16" height="16"></i>
+          Import
+        </button>
+        <input type="file" id="importFileInput" accept=".json" style="display:none" onchange="importDecksFromFile(this)">
+        <div class="search-wrap">
+          <i data-lucide="search" width="15" height="15" class="search-icon"></i>
+          <input type="search" class="search-input" id="cardSearchInput" placeholder="Search all cards…" oninput="searchCards()">
+          <div class="search-results" id="searchResults" style="display:none"></div>
+        </div>
       </div>
 
       <div class="home-summary-bento" aria-label="Study overview">
@@ -4666,6 +4724,10 @@ body:not(:has(#view-landing.active)) .flow-progress-strip {
     <section class="view quiz-view" id="view-quiz">
       <div class="quiz-header">
         <h2 class="quiz-title" id="quizTitle">Quiz</h2>
+        <button class="btn btn-ghost btn-sm" id="quizModeBtn" onclick="toggleQuizMode()" title="Quiz direction">
+          <i data-lucide="shuffle" width="14" height="14"></i>
+          <span>Mode</span>
+        </button>
         <span class="quiz-progress-label" id="quizProgressLabel"></span>
       </div>
       <div id="quizBody">
@@ -4739,7 +4801,7 @@ window.FLOWCARDS_AI_ENDPOINT = '/api/generate';
 // ============================================================
 /** @typedef {{ id:string, word:string, translation:string, partOfSpeech?:string, exampleSentence?:string, image?:{url:string,sourceUrl:string,alt:string,credit:string}|null, deckId:string }} Flashcard */
 /** @typedef {{ id:string, name:string, description:string, emoji:string }} Deck */
-/** @typedef {{ [cardId:string]: { status:'known'|'fuzzy'|'unknown'|'new', reviewCount:number, lastReview:number, nextReview:number, errorCount:number } }} ProgressMap */
+/** @typedef {{ [cardId:string]: { status:'known'|'fuzzy'|'unknown'|'new', reviewCount:number, lastReview:number, nextReview:number, errorCount:number, ef:number, interval:number } }} ProgressMap */
 
 const DEFAULT_DECKS = [
   { id:'toefl', name:'TOEFL Essentials',  description:'327 must-know academic words for TOEFL reading & writing', emoji:'📘', builtin:true },
@@ -5891,7 +5953,11 @@ let state = {
 state.progress = Object.assign({}, USER.progress);
 CARDS.forEach(c => {
   if (!state.progress[c.id]) {
-    state.progress[c.id] = { status:'new', reviewCount:0, lastReview:0, nextReview:0, errorCount:0 };
+    state.progress[c.id] = { status:'new', reviewCount:0, lastReview:0, nextReview:0, errorCount:0, ef:2.5, interval:0 };
+  } else {
+    // Migrate old progress entries that lack SM-2 fields
+    if (state.progress[c.id].ef === undefined) state.progress[c.id].ef = 2.5;
+    if (state.progress[c.id].interval === undefined) state.progress[c.id].interval = 0;
   }
 });
 
@@ -6789,6 +6855,8 @@ function saveStudioCards() {
       lastReview: 0,
       nextReview: 0,
       errorCount: 0,
+      ef: 2.5,
+      interval: 0,
     };
   });
 
@@ -6826,21 +6894,34 @@ function animateStudioEntrance() {
 // ============================================================
 // SPACED REPETITION HELPERS
 // ============================================================
-function srIntervalDays(status, errorCount) {
-  // Simple SM-2-like intervals
-  if (status === 'unknown') return 0; // show now
-  if (status === 'fuzzy')   return 1;
-  if (status === 'known')   return Math.max(2, 7 - errorCount);
-  return 0; // new
+// SM-2 algorithm (SuperMemo 2) — Wozniak 1987
+// Maps user rating to quality 0-5: unknown→0, fuzzy→3, known→5
+function sm2Schedule(p, quality) {
+  if (quality >= 3) {
+    // Correct recall
+    if (p.interval === 0) {
+      p.interval = 1;
+    } else if (p.interval === 1) {
+      p.interval = 6;
+    } else {
+      p.interval = Math.round(p.interval * p.ef);
+    }
+  } else {
+    // Incorrect recall — reset
+    p.interval = 1;
+  }
+  // Update ease factor: EF' = EF + (0.1 - (5-q) * (0.08 + (5-q) * 0.02))
+  p.ef = p.ef + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
+  if (p.ef < 1.3) p.ef = 1.3;
+  return p.interval;
 }
 
 function sortByNextReview(cards) {
   const now = Date.now();
   return [...cards].sort((a, b) => {
     const pa = state.progress[a.id], pb = state.progress[b.id];
-    const scoreA = pa.nextReview - now; // negative = overdue (comes first)
+    const scoreA = pa.nextReview - now;
     const scoreB = pb.nextReview - now;
-    // Unknown/new first, then overdue, then due later
     const orderA = pa.status === 'new' || pa.status === 'unknown' ? -Infinity : scoreA;
     const orderB = pb.status === 'new' || pb.status === 'unknown' ? -Infinity : scoreB;
     return orderA - orderB;
@@ -6854,7 +6935,8 @@ function markCard(cardId, status) {
   p.reviewCount += 1;
   p.lastReview = Date.now();
   if (status === 'unknown' || status === 'fuzzy') p.errorCount += 1;
-  const days = srIntervalDays(status, p.errorCount);
+  const quality = status === 'known' ? 5 : status === 'fuzzy' ? 3 : 0;
+  const days = sm2Schedule(p, quality);
   p.nextReview = Date.now() + days * 86400000;
   saveUserData();
 }
@@ -7113,6 +7195,174 @@ function submitAddWord() {
   }
 }
 
+// --- Edit Card ---
+let editingCardId = null;
+
+function openEditCardModal(cardId) {
+  const card = CARDS.find(c => c.id === cardId);
+  if (!card) return;
+  editingCardId = cardId;
+  document.getElementById('editWordInput').value = card.word;
+  document.getElementById('editTranslationInput').value = card.translation;
+  document.getElementById('editPOSInput').value = card.partOfSpeech || '';
+  document.getElementById('editExampleInput').value = card.exampleSentence || '';
+  setOverlayVisibility(document.getElementById('editCardModal'), true);
+  setTimeout(() => document.getElementById('editWordInput').focus(), 50);
+}
+
+function closeEditCardModal() {
+  setOverlayVisibility(document.getElementById('editCardModal'), false);
+  editingCardId = null;
+}
+
+function submitEditCard() {
+  if (!editingCardId) return;
+  const word = document.getElementById('editWordInput').value.trim();
+  const translation = document.getElementById('editTranslationInput').value.trim();
+  if (!word || !translation) {
+    showToast('⚠️  Word and translation are required', 'warning');
+    return;
+  }
+  const card = CARDS.find(c => c.id === editingCardId);
+  if (!card) return;
+  card.word = word;
+  card.translation = translation;
+  const pos = document.getElementById('editPOSInput').value.trim();
+  card.partOfSpeech = pos || undefined;
+  const example = document.getElementById('editExampleInput').value.trim();
+  card.exampleSentence = example || undefined;
+  // Update in USER data too
+  const userCard = USER.customCards.find(c => c.id === editingCardId);
+  if (userCard) {
+    userCard.word = word;
+    userCard.translation = translation;
+    userCard.partOfSpeech = pos || undefined;
+    userCard.exampleSentence = example || undefined;
+  }
+  saveUserData();
+  closeEditCardModal();
+  showToast('✅ Card updated', 'success');
+  if (document.getElementById('view-flow').classList.contains('active')) {
+    renderFlow(state.currentDeckId);
+  }
+  if (document.getElementById('view-home').classList.contains('active')) {
+    renderHome();
+  }
+}
+
+function deleteCardFromEdit() {
+  if (!editingCardId) return;
+  const card = CARDS.find(c => c.id === editingCardId);
+  if (!card) return;
+  if (!confirm(`Delete "${card.word}"? This cannot be undone.`)) return;
+  const deckId = card.deckId;
+  CARDS.splice(CARDS.findIndex(c => c.id === editingCardId), 1);
+  const userIdx = USER.customCards.findIndex(c => c.id === editingCardId);
+  if (userIdx !== -1) USER.customCards.splice(userIdx, 1);
+  delete state.progress[editingCardId];
+  saveUserData();
+  closeEditCardModal();
+  showToast('🗑️ Card deleted', 'success');
+  if (document.getElementById('view-flow').classList.contains('active')) {
+    renderFlow(deckId);
+  }
+  if (document.getElementById('view-home').classList.contains('active')) {
+    renderHome();
+  }
+}
+
+// --- Search ---
+function searchCards() {
+  const query = document.getElementById('cardSearchInput').value.trim().toLowerCase();
+  const results = document.getElementById('searchResults');
+  if (!query || query.length < 2) {
+    results.style.display = 'none';
+    return;
+  }
+  const matches = CARDS.filter(c =>
+    c.word.toLowerCase().includes(query) ||
+    c.translation.toLowerCase().includes(query)
+  ).slice(0, 15);
+  if (!matches.length) {
+    results.style.display = 'block';
+    results.innerHTML = '<div class="search-result-item" style="color:var(--color-text-muted)">No matching cards.</div>';
+    return;
+  }
+  results.style.display = 'block';
+  results.innerHTML = matches.map(c => {
+    const deck = DECKS.find(d => d.id === c.deckId);
+    return `<div class="search-result-item" onclick="navigate('flow','${c.deckId}');document.getElementById('searchResults').style.display='none';document.getElementById('cardSearchInput').value=''">
+      <span><strong>${escapeHTML(c.word)}</strong> — ${escapeHTML(c.translation)}</span>
+      <span class="search-result-deck">${deck ? deck.emoji + ' ' + deck.name : ''}</span>
+    </div>`;
+  }).join('');
+}
+
+// Hide search results on click outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.search-wrap')) {
+    const r = document.getElementById('searchResults');
+    if (r) r.style.display = 'none';
+  }
+});
+
+// --- Import / Export ---
+function exportAllDecks() {
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    decks: DECKS,
+    cards: CARDS,
+    progress: state.progress,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `flowcards-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('📦 All decks exported', 'success');
+}
+
+function importDecksFromFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.cards || !Array.isArray(data.cards)) throw new Error('Invalid format');
+      let imported = 0;
+      data.cards.forEach(card => {
+        // Skip if card already exists
+        if (CARDS.find(c => c.id === card.id)) return;
+        CARDS.push(card);
+        // Ensure deck exists
+        if (data.decks) {
+          const deck = data.decks.find(d => d.id === card.deckId);
+          if (deck && !DECKS.find(d => d.id === deck.id)) {
+            DECKS.push({ ...deck, builtin: false });
+          }
+        }
+        if (data.progress && data.progress[card.id]) {
+          state.progress[card.id] = data.progress[card.id];
+        }
+        // Add to custom cards
+        USER.customCards.push(card);
+        imported++;
+      });
+      saveUserData();
+      showToast(`📥 Imported ${imported} new cards`, 'success');
+      renderHome();
+    } catch (err) {
+      showToast('❌ Could not read the file. Make sure it is a valid FlowCards JSON backup.', 'error');
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
 function openNewDeckModal() {
   const modal = document.getElementById('newDeckModal');
   document.getElementById('newDeckName').value = '';
@@ -7350,6 +7600,9 @@ function buildCardHTML(card, i, total) {
           <div class="flashcard-face flashcard-back">
             <div class="fc-header">
               <span class="fc-pos-badge">${card.partOfSpeech || 'word'}</span>
+              <button class="icon-btn fc-edit-btn" onclick="event.stopPropagation(); openEditCardModal('${card.id}')" aria-label="Edit card" title="Edit card">
+                <i data-lucide="pencil" width="14" height="14"></i>
+              </button>
               <span class="fc-status-dot ${p.status === 'new' ? '' : p.status}"></span>
             </div>
             <div class="fc-translation">
@@ -7520,6 +7773,10 @@ function flipCard(cardId) {
 // RATING
 // ============================================================
 function rateCard(cardId, status) {
+  // Save undo snapshot
+  const prev = state.progress[cardId];
+  const undoData = prev ? { ...prev } : null;
+
   markCard(cardId, status);
 
   // Update status dot on this card (both faces)
@@ -7530,17 +7787,42 @@ function rateCard(cardId, status) {
     });
   }
 
-  // Show toast
+  // Show toast with undo
   const msgs = { known:'✅ Marked as Known', fuzzy:'🟡 Marked as Fuzzy', unknown:'🔄 Will review again' };
-  showToast(msgs[status], status === 'known' ? 'success' : '');
+  const undoId = 'undo-' + Date.now();
+  showToastWithUndo(msgs[status], undoId, () => {
+    if (undoData) {
+      Object.assign(state.progress[cardId], undoData);
+      saveUserData();
+      // Update status dot back
+      if (sec) {
+        sec.querySelectorAll('.fc-status-dot').forEach(dot => {
+          dot.className = 'fc-status-dot ' + (undoData.status === 'new' ? '' : undoData.status);
+        });
+      }
+      showToast('↩ Rating undone', 'info');
+    }
+  });
 
-  // Re-render home deck progress in background (invisible since we're in flow view)
+  // Re-render home deck progress in background
   renderHome();
 }
 
 // ============================================================
 // QUIZ MODE
 // ============================================================
+function toggleQuizMode() {
+  const modes = ['word-to-translation', 'translation-to-word', 'mixed'];
+  const idx = modes.indexOf(state.quizMode);
+  state.quizMode = modes[(idx + 1) % 3];
+  const labels = { 'word-to-translation': 'Word → Def', 'translation-to-word': 'Def → Word', 'mixed': 'Mixed' };
+  const icons = { 'word-to-translation': 'arrow-right', 'translation-to-word': 'arrow-left', 'mixed': 'shuffle' };
+  const btn = document.getElementById('quizModeBtn');
+  if (btn) btn.innerHTML = `<i data-lucide="${icons[state.quizMode]}" width="14" height="14"></i><span>${labels[state.quizMode]}</span>`;
+  lucide.createIcons();
+  showToast(`Quiz mode: ${labels[state.quizMode]}`, 'info');
+}
+
 function startQuiz(deckId) {
   const deck = DECKS.find(d => d.id === deckId);
   const cards = CARDS.filter(c => c.deckId === deckId);
@@ -7572,7 +7854,9 @@ function renderQuizQuestion() {
   const distractors = shuffleArray(deckCards).slice(0, 3);
   const choices = shuffleArray([q, ...distractors]);
 
-  const isWordToTranslation = Math.random() > 0.5;
+  const isWordToTranslation = state.quizMode === 'mixed'
+    ? Math.random() > 0.5
+    : state.quizMode === 'word-to-translation';
   const questionText = isWordToTranslation ? q.word : q.translation;
   const answerText   = isWordToTranslation ? q.translation : q.word;
   const letters = ['A', 'B', 'C', 'D'];
@@ -7717,6 +8001,29 @@ function showToast(message, type = '') {
     toast.classList.add('leaving');
     setTimeout(() => toast.remove(), 300);
   }, 2200);
+}
+
+function showToastWithUndo(message, _id, onUndo) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = 'toast toast-undo';
+  toast.innerHTML = `<span>${escapeHTML(message)}</span><button class="toast-undo-btn">Undo</button>`;
+  container.appendChild(toast);
+  const btn = toast.querySelector('.toast-undo-btn');
+  let undone = false;
+  btn.onclick = () => {
+    if (undone) return;
+    undone = true;
+    onUndo();
+    toast.classList.add('leaving');
+    setTimeout(() => toast.remove(), 300);
+  };
+  setTimeout(() => {
+    if (!undone) {
+      toast.classList.add('leaving');
+      setTimeout(() => toast.remove(), 300);
+    }
+  }, 5000);
 }
 
 // ============================================================
@@ -8321,6 +8628,11 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// Register service worker for offline support
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+}
+
 </script>
 
 <!-- ADD WORD MODAL -->
@@ -8397,6 +8709,49 @@ document.addEventListener('keydown', (e) => {
   </div>
 </div>
 
+
+<!-- EDIT CARD MODAL -->
+<div class="modal-backdrop" id="editCardModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editCardTitle">
+    <div class="modal-header">
+      <h3 id="editCardTitle">Edit card</h3>
+      <button class="icon-btn" onclick="closeEditCardModal()" aria-label="Close">
+        <i data-lucide="x" width="18" height="18"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <label class="field">
+        <span class="field-label">Word *</span>
+        <input id="editWordInput" class="field-input" type="text" autocomplete="off">
+      </label>
+      <label class="field">
+        <span class="field-label">Definition / Translation *</span>
+        <textarea id="editTranslationInput" class="field-input" rows="2"></textarea>
+      </label>
+      <div style="display:grid;grid-template-columns:1fr 2fr;gap:var(--space-3)">
+        <label class="field">
+          <span class="field-label">Part of speech</span>
+          <input id="editPOSInput" class="field-input" type="text" placeholder="noun" autocomplete="off">
+        </label>
+        <label class="field">
+          <span class="field-label">Example sentence</span>
+          <input id="editExampleInput" class="field-input" type="text" placeholder="Example usage">
+        </label>
+      </div>
+    </div>
+    <div class="modal-actions" style="justify-content:space-between">
+      <button class="btn btn-ghost" style="color:var(--color-error)" onclick="deleteCardFromEdit()">
+        <i data-lucide="trash-2" width="14" height="14"></i> Delete
+      </button>
+      <div style="display:flex;gap:var(--space-3)">
+        <button class="btn btn-ghost" onclick="closeEditCardModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="submitEditCard()">
+          <i data-lucide="check" width="14" height="14"></i> Save changes
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
