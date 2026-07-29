@@ -5952,6 +5952,53 @@ function knownTopicContent(prompt) {
   return libraries.find(library => library.match.some(term => key.includes(term))) || null;
 }
 
+function knownTopicQuestion(title, index, answer) {
+  const questionSets = {
+    Photosynthesis: [
+      'What energy conversion occurs during photosynthesis?',
+      'Where do the light-dependent reactions occur, and what do they produce?',
+      'Where does the Calvin cycle occur, and what does it use to build sugars?',
+      'Why is water required during the light-dependent reactions?',
+      'Which regions of visible light does chlorophyll absorb most strongly?',
+      'What are the main reactants and products of photosynthesis?',
+      'How do stomata support photosynthesis?',
+      'Which environmental factors can limit the rate of photosynthesis?',
+    ],
+    'Python Basics': [
+      'What is a variable in Python?',
+      'How does an if statement control whether code runs?',
+      'How does a for loop use an iterable?',
+      'When does a while loop continue repeating?',
+      'What roles do parameters and return values play in a Python function?',
+      'How is a Python list organized, and how are its items accessed?',
+      'How does a Python dictionary store and retrieve information?',
+      'How do try and except help a program handle runtime errors?',
+    ],
+    'Industrial Revolution': [
+      'Where and when did the Industrial Revolution begin?',
+      'How did mechanized production change where manufacturing took place?',
+      'Why were coal and steam power important to industrialization?',
+      'How did industrialization accelerate urbanization?',
+      'How did the factory system affect both production and working conditions?',
+      'How did railroads and steamships expand industrial markets?',
+      'Which major social classes grew as industrialization expanded?',
+      'Why did labor unions and reform movements emerge during industrialization?',
+    ],
+    'Cellular Respiration': [
+      'What is the main purpose of cellular respiration?',
+      'Where does glycolysis occur, and what does it produce from glucose?',
+      'Where does the citric acid cycle occur, and which waste product does it release?',
+      'Where is the electron transport chain located?',
+      'What roles do NADH and FADH2 play in cellular respiration?',
+      'What role does oxygen play at the end of the electron transport chain?',
+      'How does ATP synthase use a proton gradient to make ATP?',
+      'Why is fermentation useful when oxygen is unavailable?',
+    ],
+  };
+  return questionSets[title]?.[index]
+    || studioQuestionFromSentence(answer, index).question;
+}
+
 function localTopicGeneration(prompt, count) {
   const known = knownTopicContent(prompt);
   if (!known) {
@@ -5962,9 +6009,10 @@ function localTopicGeneration(prompt, count) {
   const title = known?.title || studioTitleFromPrompt(prompt);
   const points = known.points;
   const selected = points.slice(0, count);
-  const cards = selected.map((point, index) => {
-    return studioQuestionFromSentence(point, index);
-  });
+  const cards = selected.map((point, index) => ({
+    question: knownTopicQuestion(title, index, point),
+    answer: point,
+  }));
   return {
     deckName: title,
     summary: known

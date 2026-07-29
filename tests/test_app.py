@@ -86,7 +86,9 @@ class FlowCardsApiTests(unittest.TestCase):
         sent_request = mock_post.call_args.kwargs
         self.assertEqual(sent_request["json"]["model"], "deepseek-v4-pro")
         self.assertEqual(sent_request["json"]["response_format"], {"type": "json_object"})
-        self.assertEqual(sent_request["json"]["temperature"], 0.2)
+        self.assertEqual(sent_request["json"]["thinking"], {"type": "enabled"})
+        self.assertEqual(sent_request["json"]["reasoning_effort"], "high")
+        self.assertNotIn("temperature", sent_request["json"])
         self.assertEqual(sent_request["json"]["max_tokens"], 6_000)
         self.assertNotIn("test-key", str(sent_request["json"]))
         system_prompt = sent_request["json"]["messages"][0]["content"]

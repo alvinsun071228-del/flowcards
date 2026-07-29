@@ -47,6 +47,16 @@ details, fun facts, opinions, rhetorical prompts, trick questions, and anything
 unsupported by the source. A date, name, or example belongs on a card only when
 it is necessary to understand a central learning objective.
 
+Before returning the final JSON, silently audit every proposed card from 0 to 2
+on each criterion below:
+- importance: tests a central learning objective;
+- atomicity: asks exactly one thing;
+- specificity: has one clear interpretation;
+- support: the answer is supported by the source or established topic knowledge;
+- retrieval value: recalling the answer would help on a real lesson or exam.
+Keep only cards scoring at least 9 out of 10. Rewrite a weak question once; if it
+still fails, discard it. Do not include these scores in the JSON.
+
 Return one JSON object with exactly this structure:
 {
   "deckName": "short descriptive deck name",
@@ -299,9 +309,9 @@ def generate():
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": build_user_message(payload)},
         ],
-        "thinking": {"type": "disabled"},
+        "thinking": {"type": "enabled"},
+        "reasoning_effort": "high",
         "response_format": {"type": "json_object"},
-        "temperature": 0.2,
         "max_tokens": min(48_000, max(2_400, payload["count"] * 240)),
         "stream": False,
     }
