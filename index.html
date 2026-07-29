@@ -119,6 +119,8 @@ html {
   text-rendering: optimizeLegibility;
   scroll-behavior: smooth;
   scroll-padding-top: 4rem;
+  min-height: 100dvh;
+  background: var(--color-bg);
 }
 body {
   min-height: 100dvh;
@@ -162,7 +164,6 @@ input { font: inherit; color: inherit; }
    ============================================================ */
 :root,
 [data-theme="light"] {
-  color-scheme: light;
   --color-bg: #f3f4f1;
   --color-bg-deep: #e3e6df;
   --color-surface: #ffffff;
@@ -192,7 +193,6 @@ input { font: inherit; color: inherit; }
   --color-gold-highlight: rgba(161,116,22,0.14);
 }
 [data-theme="dark"] {
-  color-scheme: dark;
   --color-bg: #0e0f11;
   --color-bg-deep: #090a0b;
   --color-surface: #17181b;
