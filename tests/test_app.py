@@ -96,6 +96,61 @@ class FlowCardsApiTests(unittest.TestCase):
         self.assertIn("Return fewer cards instead of padding", system_prompt)
         self.assertIn("fun facts", system_prompt)
 
+    @patch("app.time.sleep")
+    @patch("app.requests.post")
+    def test_falls_back_to_flash_when_pro_is_rate_limited(self, mock_post, mock_sleep):
+        rate_limited_response = Mock()
+        rate_limited_response.ok = False
+        rate_limited_response.status_code = 429
+        rate_limited_response.headers = {}
+
+        successful_response = Mock()
+        successful_response.ok = True
+        successful_response.status_code = 200
+        successful_response.headers = {}
+        successful_response.json.return_value = {
+            "choices": [
+                {
+                    "message": {
+                        "content": (
+                            '{"deckName":"Cells","summary":"Core cell biology.",'
+                            '"knowledgePoints":["Cells are the basic unit of life."],'
+                            '"cards":[{"question":"What is the basic unit of life?",'
+                            '"answer":"The cell."}]}'
+                        )
+                    }
+                }
+            ]
+        }
+        mock_post.side_effect = [rate_limited_response, successful_response]
+
+        response = self.client.post(
+            "/api/generate",
+            json={
+                "mode": "topic",
+                "prompt": "Create beginner flashcards about cell biology.",
+                "sourceText": "",
+                "deckName": "Cells",
+                "count": 10,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_post.call_count, 2)
+        self.assertEqual(
+            mock_post.call_args_list[0].kwargs["json"]["model"],
+            "deepseek-v4-pro",
+        )
+        self.assertEqual(
+            mock_post.call_args_list[1].kwargs["json"]["model"],
+            "deepseek-v4-flash",
+        )
+        self.assertEqual(
+            response.headers["X-FlowCards-AI-Model"],
+            "deepseek-v4-flash",
+        )
+        mock_sleep.assert_called_once()
+
     def test_filters_trivia_statements_and_duplicate_questions(self):
         result = parse_deepseek_result(
             {

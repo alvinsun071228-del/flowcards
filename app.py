@@ -16,7 +16,10 @@ app.config["MAX_CONTENT_LENGTH"] = 1_000_000
 
 DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions"
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
+DEEPSEEK_FALLBACK_MODEL = os.getenv("DEEPSEEK_FALLBACK_MODEL", "deepseek-v4-flash")
 REQUEST_TIMEOUT_SECONDS = 60
+UPSTREAM_ATTEMPT_TIMEOUT_SECONDS = 45
+UPSTREAM_DEADLINE_SECONDS = 55
 MAX_SOURCE_CHARACTERS = 60_000
 MAX_PROMPT_CHARACTERS = 4_000
 RATE_LIMIT_REQUESTS = 10
@@ -304,7 +307,6 @@ def generate():
         return jsonify({"error": str(exc)}), 400
 
     deepseek_payload = {
-        "model": DEEPSEEK_MODEL,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": build_user_message(payload)},
@@ -316,20 +318,52 @@ def generate():
         "stream": False,
     }
 
-    try:
-        deepseek_response = requests.post(
-            DEEPSEEK_API_URL,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json=deepseek_payload,
-            timeout=REQUEST_TIMEOUT_SECONDS,
+    models = [DEEPSEEK_MODEL]
+    if DEEPSEEK_FALLBACK_MODEL and DEEPSEEK_FALLBACK_MODEL != DEEPSEEK_MODEL:
+        models.append(DEEPSEEK_FALLBACK_MODEL)
+
+    started_at = time.monotonic()
+    deepseek_response = None
+    used_model = DEEPSEEK_MODEL
+    for attempt, model in enumerate(models):
+        elapsed = time.monotonic() - started_at
+        remaining = UPSTREAM_DEADLINE_SECONDS - elapsed
+        if remaining < 5:
+            break
+
+        used_model = model
+        attempt_payload = {**deepseek_payload, "model": model}
+        try:
+            deepseek_response = requests.post(
+                DEEPSEEK_API_URL,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=attempt_payload,
+                timeout=min(UPSTREAM_ATTEMPT_TIMEOUT_SECONDS, remaining),
+            )
+        except requests.Timeout:
+            return jsonify({"error": "DeepSeek took too long to respond. Please try again."}), 504
+        except requests.RequestException:
+            return jsonify({"error": "The server could not reach DeepSeek. Please try again."}), 502
+
+        request_id = deepseek_response.headers.get("x-request-id", "unavailable")
+        app.logger.warning(
+            "DeepSeek attempt=%s model=%s status=%s request_id=%s",
+            attempt + 1,
+            model,
+            deepseek_response.status_code,
+            request_id,
         )
-    except requests.Timeout:
-        return jsonify({"error": "DeepSeek took too long to respond. Please try again."}), 504
-    except requests.RequestException:
-        return jsonify({"error": "The server could not reach DeepSeek. Please try again."}), 502
+
+        if deepseek_response.status_code not in {429, 500, 502, 503, 504}:
+            break
+        if attempt < len(models) - 1:
+            time.sleep(1.25)
+
+    if deepseek_response is None:
+        return jsonify({"error": "DeepSeek did not respond before the server deadline."}), 504
 
     if deepseek_response.status_code == 401:
         return jsonify({"error": "The DeepSeek API key was rejected."}), 502
@@ -349,6 +383,7 @@ def generate():
 
     response = jsonify(result)
     response.headers["Cache-Control"] = "no-store"
+    response.headers["X-FlowCards-AI-Model"] = used_model
     return response
 
 

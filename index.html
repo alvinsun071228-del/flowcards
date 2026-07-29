@@ -5632,6 +5632,7 @@ const studioState = {
   suggestedDeckName: 'AI Study Deck',
   initialized: false,
   processingTimeline: null,
+  requestInFlight: false,
 };
 
 function studioWait(ms) {
@@ -6162,6 +6163,10 @@ function startStudioProcessingMotion() {
 }
 
 async function generateStudioDeck(mode) {
+  if (studioState.requestInFlight) {
+    showToast('A deck is already being generated. Please wait.', 'error');
+    return;
+  }
   const payload = studioPayload(mode);
   try {
     validateStudioPayload(payload);
@@ -6170,6 +6175,7 @@ async function generateStudioDeck(mode) {
     return;
   }
 
+  studioState.requestInFlight = true;
   setStudioLoading(true);
   startStudioProcessingMotion();
   try {
@@ -6183,6 +6189,7 @@ async function generateStudioDeck(mode) {
     document.getElementById('studioEmptyState')?.style.removeProperty('display');
     showToast(error.message || 'Cards could not be generated.', 'error');
   } finally {
+    studioState.requestInFlight = false;
     studioState.processingTimeline?.kill();
     studioState.processingTimeline = null;
     document.getElementById('studioProcessing')?.classList.remove('visible');
