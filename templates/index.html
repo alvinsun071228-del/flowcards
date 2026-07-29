@@ -2,7 +2,9 @@
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" id="themeColorMeta" content="#0e0f11" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <title>FlowCards — Vocabulary Flashcards</title>
 
 <!-- Fonts -->
@@ -119,6 +121,8 @@ html {
   text-rendering: optimizeLegibility;
   scroll-behavior: smooth;
   scroll-padding-top: 4rem;
+  min-height: 100dvh;
+  background: var(--viewport-chrome-bg, var(--color-bg));
 }
 body {
   min-height: 100dvh;
@@ -136,20 +140,17 @@ img, svg { display: block; max-width: 100%; }
   position: fixed;
   inset: 0;
   background: var(--color-bg);
-  transform: scaleY(0);
-  transform-origin: top;
+  clip-path: inset(0 0 100% 0);
   z-index: 99999;
   pointer-events: none;
-  will-change: transform;
 }
 #theme-curtain.falling {
-  transform: scaleY(1);
-  transition: transform 550ms cubic-bezier(0.76, 0, 0.24, 1);
+  clip-path: inset(0 0 0 0);
+  transition: clip-path 550ms cubic-bezier(0.76, 0, 0.24, 1);
 }
 #theme-curtain.rising {
-  transform: scaleY(0);
-  transform-origin: bottom;
-  transition: transform 550ms cubic-bezier(0.76, 0, 0.24, 1);
+  clip-path: inset(100% 0 0 0);
+  transition: clip-path 550ms cubic-bezier(0.76, 0, 0.24, 1);
 }
 [data-theme-toggle] {
   transition: transform 0.15s ease, background 0.3s ease, color 0.3s ease;
@@ -165,7 +166,7 @@ input { font: inherit; color: inherit; }
    ============================================================ */
 :root,
 [data-theme="light"] {
-  color-scheme: light;
+  --viewport-chrome-bg: #f3f4f1;
   --color-bg: #f3f4f1;
   --color-bg-deep: #e3e6df;
   --color-surface: #ffffff;
@@ -195,7 +196,7 @@ input { font: inherit; color: inherit; }
   --color-gold-highlight: rgba(161,116,22,0.14);
 }
 [data-theme="dark"] {
-  color-scheme: dark;
+  --viewport-chrome-bg: #0e0f11;
   --color-bg: #0e0f11;
   --color-bg-deep: #090a0b;
   --color-surface: #17181b;
@@ -1368,14 +1369,23 @@ body:not(:has(#view-landing.active)) .toast { color: var(--color-text); backgrou
    ADD-WORD / NEW-DECK MODAL + DISCRETE FLOW STEPPER
    ============================================================ */
 .modal-backdrop {
-  position: fixed; inset: 0;
-  background: oklch(0 0 0 / 0.55);
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: rgba(0, 0, 0, 0.55);
   display: none;
   align-items: center;
   justify-content: center;
   z-index: 200;
   padding: var(--space-4);
-  backdrop-filter: blur(4px);
+  padding-top: max(var(--space-4), env(safe-area-inset-top, 0px));
+  padding-right: max(var(--space-4), env(safe-area-inset-right, 0px));
+  padding-bottom: max(var(--space-4), env(safe-area-inset-bottom, 0px));
+  padding-left: max(var(--space-4), env(safe-area-inset-left, 0px));
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 .modal-backdrop.show { display: flex; animation: fadeIn 150ms ease; }
 @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
@@ -1581,10 +1591,14 @@ textarea.field-input { resize: vertical; min-height: 60px; }
    DYNAMIC ISLAND TOC  (flow view, bottom-center pill)
    ============================================================ */
 .island-backdrop {
-  position: fixed; inset: 0;
-  background: oklch(0 0 0 / 0.35);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   z-index: 150;
   opacity: 0;
   pointer-events: none;
@@ -1594,7 +1608,7 @@ textarea.field-input { resize: vertical; min-height: 60px; }
 
 .island {
   position: fixed;
-  bottom: 30px;
+  bottom: max(30px, env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 160;
@@ -6414,6 +6428,40 @@ function reviewFirstAvailableDeck() {
 // ============================================================
 // CUSTOM CARDS + DECKS (user can add their own)
 // ============================================================
+const VIEWPORT_THEME_COLORS = {
+  light: '#f3f4f1',
+  dark: '#0e0f11',
+};
+
+function blendWithBlack(hex, opacity) {
+  const value = hex.replace('#', '');
+  const keep = 1 - opacity;
+  const channels = [0, 2, 4].map(offset =>
+    Math.round(parseInt(value.slice(offset, offset + 2), 16) * keep)
+  );
+  return '#' + channels.map(channel => channel.toString(16).padStart(2, '0')).join('');
+}
+
+function syncViewportChrome() {
+  const root = document.documentElement;
+  const theme = root.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  const modalOpen = Boolean(document.querySelector('.modal-backdrop.show'));
+  const islandOpen = Boolean(document.querySelector('.island-backdrop.show'));
+  const overlayOpacity = modalOpen ? 0.55 : (islandOpen ? 0.35 : 0);
+  const color = overlayOpacity
+    ? blendWithBlack(VIEWPORT_THEME_COLORS[theme], overlayOpacity)
+    : VIEWPORT_THEME_COLORS[theme];
+  document.getElementById('themeColorMeta')?.setAttribute('content', color);
+  root.style.setProperty('--viewport-chrome-bg', color);
+  root.classList.toggle('overlay-open', overlayOpacity > 0);
+}
+
+function setOverlayVisibility(element, visible) {
+  if (!element) return;
+  element.classList.toggle('show', visible);
+  syncViewportChrome();
+}
+
 function openAddWordModal(deckId) {
   const modal = document.getElementById('addWordModal');
   const select = document.getElementById('addWordDeckSelect');
@@ -6424,12 +6472,12 @@ function openAddWordModal(deckId) {
   document.getElementById('addWordTranslation').value = '';
   document.getElementById('addWordPOS').value = '';
   document.getElementById('addWordExample').value = '';
-  modal.classList.add('show');
+  setOverlayVisibility(modal, true);
   setTimeout(() => document.getElementById('addWordInput').focus(), 50);
 }
 
 function closeAddWordModal() {
-  document.getElementById('addWordModal').classList.remove('show');
+  setOverlayVisibility(document.getElementById('addWordModal'), false);
 }
 
 function submitAddWord() {
@@ -6463,11 +6511,11 @@ function openNewDeckModal() {
   document.getElementById('newDeckName').value = '';
   document.getElementById('newDeckDesc').value = '';
   document.getElementById('newDeckEmoji').value = '📚';
-  modal.classList.add('show');
+  setOverlayVisibility(modal, true);
   setTimeout(() => document.getElementById('newDeckName').focus(), 50);
 }
 function closeNewDeckModal() {
-  document.getElementById('newDeckModal').classList.remove('show');
+  setOverlayVisibility(document.getElementById('newDeckModal'), false);
 }
 function submitNewDeck() {
   const name  = document.getElementById('newDeckName').value.trim();
@@ -7077,8 +7125,8 @@ function showToast(message, type = '') {
   function applyTheme(theme) {
     d = theme;
     root.setAttribute('data-theme', d);
-    root.style.colorScheme = d;
     localStorage.setItem(THEME_KEY, d);
+    syncViewportChrome();
     updateToggleIcon();
   }
 
@@ -7089,19 +7137,26 @@ function showToast(message, type = '') {
   document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
     const next = d === 'dark' ? 'light' : 'dark';
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!curtain || !window.gsap || reduceMotion) {
+    const isIOSWebKit = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (!curtain || !window.gsap || reduceMotion || isIOSWebKit) {
       applyTheme(next);
       return;
     }
     if (curtainTimeline) curtainTimeline.kill();
     curtain.style.background = next === 'dark' ? '#0e0f11' : '#f3f4f1';
-    curtainTimeline = gsap.timeline({ defaults: { ease: 'power3.inOut' } });
+    curtainTimeline = gsap.timeline({
+      defaults: { ease: 'power3.inOut' },
+      onComplete: () => {
+        gsap.set(curtain, { clearProps: 'all' });
+        curtain.style.background = '';
+      },
+    });
     curtainTimeline
-      .set(curtain, { scaleY: 0, transformOrigin: 'top' })
-      .to(curtain, { scaleY: 1, duration: 0.28 })
+      .set(curtain, { clipPath: 'inset(0 0 100% 0)' })
+      .to(curtain, { clipPath: 'inset(0 0 0 0)', duration: 0.28 })
       .add(() => applyTheme(next))
-      .set(curtain, { transformOrigin: 'bottom' })
-      .to(curtain, { scaleY: 0, duration: 0.32 });
+      .to(curtain, { clipPath: 'inset(100% 0 0 0)', duration: 0.32 });
   });
 })();
 
@@ -7340,7 +7395,7 @@ function islandOpen() {
   const bd = document.getElementById('islandBackdrop');
   if (!el) return;
   el.classList.add('expanded');
-  bd.classList.add('show');
+  setOverlayVisibility(bd, true);
   renderIslandList();
 }
 function islandClose() {
@@ -7348,7 +7403,7 @@ function islandClose() {
   const bd = document.getElementById('islandBackdrop');
   if (!el) return;
   el.classList.remove('expanded');
-  bd.classList.remove('show');
+  setOverlayVisibility(bd, false);
 }
 
 function renderIslandList() {
