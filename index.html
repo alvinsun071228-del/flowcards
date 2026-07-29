@@ -1660,7 +1660,10 @@ textarea.field-input { resize: vertical; min-height: 60px; }
     height 500ms cubic-bezier(0.22, 1, 0.36, 1),
     border-radius 500ms cubic-bezier(0.22, 1, 0.36, 1),
     transform 500ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 300ms ease;
+    opacity 300ms ease,
+    background-color 260ms ease,
+    color 260ms ease,
+    border-color 260ms ease;
   opacity: 0;
   transform: translateX(-50%) translateY(50px);
 }
@@ -3085,14 +3088,16 @@ body:has(#view-landing.active) .icon-btn:hover {
 [data-theme="dark"] .field-input { background: #242424; color: #f5f5f5; border-color: rgba(255,255,255,0.10); }
 .field-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(204,255,0,0.30); }
 
-/* Dynamic Island tweaks (keep its glass feel on blue) */
+/* Dynamic Island glass follows the active theme */
 .island {
-  background: rgba(0,0,0,0.85);
-  color: #f5f5f5;
-  border: 1px solid rgba(255,255,255,0.10);
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  backdrop-filter: blur(22px) saturate(1.15);
+  -webkit-backdrop-filter: blur(22px) saturate(1.15);
 }
-.island-pill, .island-label { color: #f5f5f5; }
-.island-item { color: #f5f5f5; }
+.island-pill, .island-label { color: var(--color-text); }
+.island-item { color: var(--color-text-muted); }
 
 /* Toasts on bright blue */
 .toast {
