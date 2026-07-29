@@ -19,6 +19,20 @@ class FlowCardsApiTests(unittest.TestCase):
             self.assertIn(b"FlowCards", response.data)
             self.assertIn(b"DeepSeek V4 Pro", response.data)
 
+    def test_flashcard_answers_scroll_without_moving_rating_buttons(self):
+        with self.client.get("/") as response:
+            html = response.get_data(as_text=True)
+            self.assertIn("height: clamp(340px, 62dvh, 520px)", html)
+            self.assertIn(".fc-answer-content", html)
+            self.assertIn("overflow-y: auto", html)
+            self.assertIn("-webkit-overflow-scrolling: touch", html)
+            self.assertIn(
+                ".fc-rating {\n  display: flex; gap: var(--space-2);"
+                " margin-top: var(--space-4);\n  justify-content: center;\n"
+                "  flex: 0 0 auto;",
+                html,
+            )
+
     def test_rejects_short_topic(self):
         response = self.client.post(
             "/api/generate",

@@ -1068,7 +1068,7 @@ body:not(:has(#view-landing.active)) .toast { color: var(--color-text); backgrou
 .flashcard-inner {
   position: relative;
   width: 100%;
-  min-height: 340px;
+  height: clamp(340px, 62dvh, 520px);
   transform-style: preserve-3d;
   transition: transform 0.55s cubic-bezier(0.16,1,0.3,1);
   border-radius: var(--radius-2xl);
@@ -1082,7 +1082,9 @@ body:not(:has(#view-landing.active)) .toast { color: var(--color-text); backgrou
   padding: var(--space-8) var(--space-8);
   display: flex; flex-direction: column;
   box-shadow: var(--shadow-lg);
-  min-height: 340px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 .flashcard-front {
   background: var(--color-surface);
@@ -1097,6 +1099,7 @@ body:not(:has(#view-landing.active)) .toast { color: var(--color-text); backgrou
 .fc-header {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: var(--space-4);
+  flex: 0 0 auto;
 }
 .fc-pos-badge {
   font-size: var(--text-xs); font-weight: 600;
@@ -1119,18 +1122,38 @@ body:not(:has(#view-landing.active)) .toast { color: var(--color-text); backgrou
   font-size: var(--text-xl); font-weight: 800;
   letter-spacing: -0.03em; line-height: 1.15;
   flex: 1; display: flex; align-items: center;
+  min-height: 0;
+  overflow: auto;
+  overflow-wrap: anywhere;
 }
 .fc-tap-hint {
   font-size: var(--text-xs); color: var(--color-text-faint);
   display: flex; align-items: center; gap: var(--space-1);
   align-self: flex-end; margin-top: var(--space-2);
+  flex: 0 0 auto;
 }
 .flashcard-back .fc-tap-hint { color: oklch(from var(--color-text-inverse) l c h / 0.55); }
 .fc-translation {
   font-family: var(--font-display);
   font-size: var(--text-xl); font-weight: 800;
   letter-spacing: -0.02em; line-height: 1.15;
-  flex: 1; display: flex; align-items: center; flex-direction: column; justify-content: center; gap: var(--space-3);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  padding: var(--space-2);
+}
+.fc-answer-content {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-3);
+  overflow-wrap: anywhere;
 }
 .fc-example {
   font-size: var(--text-sm); font-style: italic;
@@ -1142,6 +1165,7 @@ body:not(:has(#view-landing.active)) .toast { color: var(--color-text); backgrou
 .fc-rating {
   display: flex; gap: var(--space-2); margin-top: var(--space-4);
   justify-content: center;
+  flex: 0 0 auto;
 }
 .fc-rating .btn { flex: 1; max-width: 120px; justify-content: center; }
 .btn-known   { background: var(--color-success-highlight); color: var(--color-success); border-color: transparent; }
@@ -1365,6 +1389,10 @@ body:not(:has(#view-landing.active)) .toast { color: var(--color-text); backgrou
   .fc-word, .fc-translation { font-size: var(--text-lg); }
   .quiz-question { font-size: var(--text-lg); }
   .flashcard-face { padding: var(--space-6); }
+  .flashcard-inner {
+    height: min(440px, calc(100dvh - 180px));
+    min-height: 320px;
+  }
   .flow-section-inner { padding: 56px var(--space-4) var(--space-4); }
 }
 
@@ -6838,8 +6866,10 @@ function buildCardHTML(card, i, total) {
               <span class="fc-status-dot ${p.status === 'new' ? '' : p.status}"></span>
             </div>
             <div class="fc-translation">
-              ${escapeHTML(card.translation)}
-              ${card.exampleSentence ? `<div class="fc-example">"${escapeHTML(card.exampleSentence)}"</div>` : ''}
+              <div class="fc-answer-content">
+                <div>${escapeHTML(card.translation)}</div>
+                ${card.exampleSentence ? `<div class="fc-example">"${escapeHTML(card.exampleSentence)}"</div>` : ''}
+              </div>
             </div>
             <div class="fc-rating">
               <button class="btn btn-unknown btn-sm" onclick="event.stopPropagation(); rateCard('${card.id}','unknown')">
