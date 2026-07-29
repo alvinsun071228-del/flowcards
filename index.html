@@ -136,19 +136,17 @@ img, svg { display: block; max-width: 100%; }
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   background: var(--color-bg);
-  transform: scaleY(0);
-  transform-origin: top;
+  clip-path: inset(0 0 100% 0);
   z-index: 99999;
   pointer-events: none;
 }
 #theme-curtain.falling {
-  transform: scaleY(1);
-  transition: transform 550ms cubic-bezier(0.76, 0, 0.24, 1);
+  clip-path: inset(0 0 0 0);
+  transition: clip-path 550ms cubic-bezier(0.76, 0, 0.24, 1);
 }
 #theme-curtain.rising {
-  transform: scaleY(0);
-  transform-origin: bottom;
-  transition: transform 550ms cubic-bezier(0.76, 0, 0.24, 1);
+  clip-path: inset(100% 0 0 0);
+  transition: clip-path 550ms cubic-bezier(0.76, 0, 0.24, 1);
 }
 [data-theme-toggle] {
   transition: transform 0.15s ease, background 0.3s ease, color 0.3s ease;
@@ -7073,7 +7071,6 @@ function showToast(message, type = '') {
   function applyTheme(theme) {
     d = theme;
     root.setAttribute('data-theme', d);
-    root.style.colorScheme = d;
     localStorage.setItem(THEME_KEY, d);
     updateToggleIcon();
   }
@@ -7099,11 +7096,10 @@ function showToast(message, type = '') {
       },
     });
     curtainTimeline
-      .set(curtain, { scaleY: 0, transformOrigin: 'top' })
-      .to(curtain, { scaleY: 1, duration: 0.28 })
+      .set(curtain, { clipPath: 'inset(0 0 100% 0)' })
+      .to(curtain, { clipPath: 'inset(0 0 0 0)', duration: 0.28 })
       .add(() => applyTheme(next))
-      .set(curtain, { transformOrigin: 'bottom' })
-      .to(curtain, { scaleY: 0, duration: 0.32 });
+      .to(curtain, { clipPath: 'inset(100% 0 0 0)', duration: 0.32 });
   });
 })();
 
