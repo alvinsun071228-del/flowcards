@@ -3171,6 +3171,18 @@ body:has(#view-landing.active) .icon-btn:hover {
   background: var(--color-primary);
   box-shadow: 0 0 0 4px var(--color-primary-highlight);
 }
+.studio-status[data-ai-status="checking"] .studio-status-dot {
+  background: var(--color-gold);
+  box-shadow: 0 0 0 4px var(--color-gold-highlight);
+}
+.studio-status[data-ai-status="offline"] .studio-status-dot {
+  background: var(--color-error);
+  box-shadow: 0 0 0 4px var(--color-error-highlight);
+}
+.studio-status[data-ai-status="ready"] .studio-status-dot {
+  background: var(--color-success);
+  box-shadow: 0 0 0 4px var(--color-success-highlight);
+}
 .studio-shell {
   display: grid;
   grid-template-columns: 210px minmax(0, 1fr) 350px;
@@ -3514,6 +3526,10 @@ body:has(#view-landing.active) .icon-btn:hover {
   cursor: wait;
   opacity: 0.65;
   transform: none;
+}
+.studio-view[data-ai-status="offline"] .studio-generate[disabled] {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 .studio-output {
   display: flex;
@@ -4201,9 +4217,9 @@ body:not(:has(#view-landing.active)) .flow-progress-strip {
             writes clear question-and-answer cards, and saves them into your existing study system.
           </p>
         </div>
-        <div class="studio-status" title="Flashcards are generated securely through the Flask backend and DeepSeek API.">
+        <div class="studio-status" data-ai-status="checking" title="FlowCards checks the Flask AI service before allowing generation.">
           <span class="studio-status-dot" aria-hidden="true"></span>
-          <span id="studioEngineLabel">DeepSeek V4 Pro</span>
+          <span id="studioEngineLabel">Checking AI…</span>
         </div>
       </div>
 
@@ -5648,9 +5664,8 @@ CARDS.forEach(c => {
 
 // ============================================================
 // AI CREATION STUDIO
-// Uses a local, deterministic demo engine by default. A Flask
-// backend can set window.FLOWCARDS_AI_ENDPOINT to return real AI
-// results without exposing API keys in the browser.
+// Generation stays disabled until the Flask health endpoint confirms that
+// DeepSeek is configured. There is intentionally no local fake-AI fallback.
 // ============================================================
 const studioState = {
   mode: 'topic',
@@ -5663,6 +5678,9 @@ const studioState = {
   initialized: false,
   processingTimeline: null,
   requestInFlight: false,
+  aiStatus: 'checking',
+  aiMessage: 'Checking the AI service…',
+  healthCheckPromise: null,
 };
 
 function studioWait(ms) {
@@ -5693,6 +5711,7 @@ function setupStudio() {
   populateStudioTargetDecks();
   if (studioState.initialized) return;
   studioState.initialized = true;
+  checkStudioAIHealth();
 
   const drop = document.getElementById('studioFileDrop');
   if (drop) {
@@ -6069,40 +6088,113 @@ function localSourceGeneration(source, count, deckName) {
 
 async function requestStudioGeneration(payload) {
   const endpoint = window.FLOWCARDS_AI_ENDPOINT;
-  if (endpoint) {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    let result = null;
-    try {
-      result = await response.json();
-    } catch (_error) {
-      // Preserve the HTTP status fallback when the hosting platform returns HTML.
-    }
-    if (!response.ok) {
-      throw new Error(result?.error || `AI request failed with status ${response.status}.`);
-    }
-    if (!result) throw new Error('The AI server returned an unreadable response.');
-    const cards = Array.isArray(result.cards) ? result.cards.map(card => ({
-      question: String(card.question || card.front || '').trim(),
-      answer: String(card.answer || card.back || '').trim(),
-    })).filter(card => card.question && card.answer) : [];
-    if (!cards.length) throw new Error('The AI response did not include usable flashcards.');
-    return {
-      deckName: String(result.deckName || payload.deckName || 'AI Study Deck'),
-      summary: String(result.summary || ''),
-      knowledgePoints: Array.isArray(result.knowledgePoints)
-        ? result.knowledgePoints.map(String)
-        : Array.isArray(result.knowledge_points) ? result.knowledge_points.map(String) : [],
-      cards,
-    };
+  if (!endpoint || studioState.aiStatus !== 'ready') {
+    throw new Error(studioState.aiMessage || 'AI is offline. Start the Flask app before generating cards.');
+  }
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  let result = null;
+  try {
+    result = await response.json();
+  } catch (_error) {
+    // Preserve the HTTP status fallback when the hosting platform returns HTML.
+  }
+  if (!response.ok) {
+    throw new Error(result?.error || `AI request failed with status ${response.status}.`);
+  }
+  if (!result) throw new Error('The AI server returned an unreadable response.');
+  const cards = Array.isArray(result.cards) ? result.cards.map(card => ({
+    question: String(card.question || card.front || '').trim(),
+    answer: String(card.answer || card.back || '').trim(),
+  })).filter(card => card.question && card.answer) : [];
+  if (!cards.length) throw new Error('The AI response did not include usable flashcards.');
+  return {
+    deckName: String(result.deckName || payload.deckName || 'AI Study Deck'),
+    summary: String(result.summary || ''),
+    knowledgePoints: Array.isArray(result.knowledgePoints)
+      ? result.knowledgePoints.map(String)
+      : Array.isArray(result.knowledge_points) ? result.knowledge_points.map(String) : [],
+    cards,
+  };
+}
+
+function setStudioAIStatus(status, message, label) {
+  studioState.aiStatus = status;
+  studioState.aiMessage = message;
+  const view = document.getElementById('view-studio');
+  const statusPill = document.querySelector('.studio-status');
+  const engineLabel = document.getElementById('studioEngineLabel');
+  view?.setAttribute('data-ai-status', status);
+  statusPill?.setAttribute('data-ai-status', status);
+  statusPill?.setAttribute('title', message);
+  if (engineLabel) engineLabel.textContent = label;
+  updateStudioGenerateAvailability();
+}
+
+function updateStudioGenerateAvailability() {
+  const disabled = studioState.requestInFlight || studioState.aiStatus !== 'ready';
+  document.querySelectorAll('[data-generate-button]').forEach(button => {
+    button.disabled = disabled;
+    button.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+    button.setAttribute('aria-busy', studioState.requestInFlight ? 'true' : 'false');
+  });
+}
+
+function studioHealthEndpoint() {
+  const endpoint = window.FLOWCARDS_AI_ENDPOINT;
+  if (!endpoint) return '';
+  return endpoint.replace(/\/generate\/?$/, '/health');
+}
+
+async function checkStudioAIHealth(force = false) {
+  if (studioState.healthCheckPromise && !force) return studioState.healthCheckPromise;
+  const healthEndpoint = studioHealthEndpoint();
+  if (!healthEndpoint) {
+    setStudioAIStatus(
+      'offline',
+      'AI is not connected. Start the Flask app to generate accurate flashcards.',
+      'AI offline'
+    );
+    return false;
   }
 
-  await studioWait(900);
-  if (payload.mode === 'topic') return localTopicGeneration(payload.prompt, payload.count);
-  return localSourceGeneration(payload.sourceText, payload.count, payload.deckName);
+  setStudioAIStatus('checking', 'Checking the Flask AI service…', 'Checking AI…');
+  studioState.healthCheckPromise = (async () => {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      let response;
+      try {
+        response = await fetch(healthEndpoint, {
+          cache: 'no-store',
+          headers: { Accept: 'application/json' },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+      const health = response.ok ? await response.json() : null;
+      if (!health?.ok || !health?.configured) {
+        throw new Error('DeepSeek is not configured.');
+      }
+      const model = String(health.model || 'DeepSeek').replace('deepseek-', 'DeepSeek ');
+      setStudioAIStatus('ready', `AI ready: ${model}`, model);
+      return true;
+    } catch (_error) {
+      setStudioAIStatus(
+        'offline',
+        'AI is unavailable. Start Flask and configure DEEPSEEK_API_KEY, then reload this page.',
+        'AI offline'
+      );
+      return false;
+    } finally {
+      studioState.healthCheckPromise = null;
+    }
+  })();
+  return studioState.healthCheckPromise;
 }
 
 function studioPayload(mode) {
@@ -6197,6 +6289,13 @@ async function generateStudioDeck(mode) {
     showToast('A deck is already being generated. Please wait.', 'error');
     return;
   }
+  if (studioState.aiStatus !== 'ready') {
+    const ready = await checkStudioAIHealth(true);
+    if (!ready) {
+      showToast(studioState.aiMessage, 'error');
+      return;
+    }
+  }
   const payload = studioPayload(mode);
   try {
     validateStudioPayload(payload);
@@ -6207,6 +6306,7 @@ async function generateStudioDeck(mode) {
 
   studioState.requestInFlight = true;
   setStudioLoading(true);
+  updateStudioGenerateAvailability();
   startStudioProcessingMotion();
   try {
     const result = await requestStudioGeneration(payload);
@@ -6223,10 +6323,7 @@ async function generateStudioDeck(mode) {
     studioState.processingTimeline?.kill();
     studioState.processingTimeline = null;
     document.getElementById('studioProcessing')?.classList.remove('visible');
-    document.querySelectorAll('[data-generate-button]').forEach(button => {
-      button.disabled = false;
-      button.setAttribute('aria-busy', 'false');
-    });
+    updateStudioGenerateAvailability();
   }
 }
 

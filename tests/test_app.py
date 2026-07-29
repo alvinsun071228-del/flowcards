@@ -17,7 +17,7 @@ class FlowCardsApiTests(unittest.TestCase):
         with self.client.get("/") as response:
             self.assertEqual(response.status_code, 200)
             self.assertIn(b"FlowCards", response.data)
-            self.assertIn(b"DeepSeek V4 Pro", response.data)
+            self.assertIn(b"Checking AI", response.data)
 
     def test_flashcard_answers_scroll_without_moving_rating_buttons(self):
         with self.client.get("/") as response:
@@ -30,6 +30,21 @@ class FlowCardsApiTests(unittest.TestCase):
                 ".fc-rating {\n  display: flex; gap: var(--space-2);"
                 " margin-top: var(--space-4);\n  justify-content: center;\n"
                 "  flex: 0 0 auto;",
+                html,
+            )
+
+    def test_ai_generation_requires_a_healthy_backend(self):
+        with self.client.get("/") as response:
+            html = response.get_data(as_text=True)
+            self.assertIn("checkStudioAIHealth", html)
+            self.assertIn("health?.configured", html)
+            self.assertIn("There is intentionally no local fake-AI fallback", html)
+            self.assertNotIn(
+                "return localTopicGeneration(payload.prompt, payload.count)",
+                html,
+            )
+            self.assertNotIn(
+                "return localSourceGeneration(payload.sourceText, payload.count, payload.deckName)",
                 html,
             )
 
