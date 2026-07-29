@@ -306,17 +306,25 @@ def generate():
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
+    use_thinking = (
+        payload["count"] > 40
+        or (
+            payload["mode"] in {"file", "notes"}
+            and len(payload["sourceText"]) > 15_000
+        )
+    )
     deepseek_payload = {
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": build_user_message(payload)},
         ],
-        "thinking": {"type": "enabled"},
-        "reasoning_effort": "high",
+        "thinking": {"type": "enabled" if use_thinking else "disabled"},
         "response_format": {"type": "json_object"},
         "max_tokens": min(48_000, max(2_400, payload["count"] * 240)),
         "stream": False,
     }
+    if use_thinking:
+        deepseek_payload["reasoning_effort"] = "high"
 
     models = [DEEPSEEK_MODEL]
     if DEEPSEEK_FALLBACK_MODEL and DEEPSEEK_FALLBACK_MODEL != DEEPSEEK_MODEL:
@@ -384,6 +392,7 @@ def generate():
     response = jsonify(result)
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-FlowCards-AI-Model"] = used_model
+    response.headers["X-FlowCards-AI-Thinking"] = "enabled" if use_thinking else "disabled"
     return response
 
 

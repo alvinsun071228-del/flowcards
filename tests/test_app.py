@@ -86,8 +86,8 @@ class FlowCardsApiTests(unittest.TestCase):
         sent_request = mock_post.call_args.kwargs
         self.assertEqual(sent_request["json"]["model"], "deepseek-v4-pro")
         self.assertEqual(sent_request["json"]["response_format"], {"type": "json_object"})
-        self.assertEqual(sent_request["json"]["thinking"], {"type": "enabled"})
-        self.assertEqual(sent_request["json"]["reasoning_effort"], "high")
+        self.assertEqual(sent_request["json"]["thinking"], {"type": "disabled"})
+        self.assertNotIn("reasoning_effort", sent_request["json"])
         self.assertNotIn("temperature", sent_request["json"])
         self.assertEqual(sent_request["json"]["max_tokens"], 6_000)
         self.assertNotIn("test-key", str(sent_request["json"]))
@@ -150,6 +150,45 @@ class FlowCardsApiTests(unittest.TestCase):
             "deepseek-v4-flash",
         )
         mock_sleep.assert_called_once()
+
+    @patch("app.requests.post")
+    def test_uses_thinking_for_large_decks(self, mock_post):
+        deepseek_response = Mock()
+        deepseek_response.ok = True
+        deepseek_response.status_code = 200
+        deepseek_response.headers = {}
+        deepseek_response.json.return_value = {
+            "choices": [
+                {
+                    "message": {
+                        "content": (
+                            '{"deckName":"Calculus","summary":"Core calculus ideas.",'
+                            '"knowledgePoints":["Rates of change"],'
+                            '"cards":[{"question":"What does a derivative measure?",'
+                            '"answer":"An instantaneous rate of change."}]}'
+                        )
+                    }
+                }
+            ]
+        }
+        mock_post.return_value = deepseek_response
+
+        response = self.client.post(
+            "/api/generate",
+            json={
+                "mode": "topic",
+                "prompt": "Create a comprehensive calculus review deck.",
+                "sourceText": "",
+                "deckName": "Calculus",
+                "count": 50,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        sent_payload = mock_post.call_args.kwargs["json"]
+        self.assertEqual(sent_payload["thinking"], {"type": "enabled"})
+        self.assertEqual(sent_payload["reasoning_effort"], "high")
+        self.assertEqual(response.headers["X-FlowCards-AI-Thinking"], "enabled")
 
     def test_filters_trivia_statements_and_duplicate_questions(self):
         result = parse_deepseek_result(
