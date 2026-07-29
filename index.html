@@ -138,7 +138,7 @@ img, svg { display: block; max-width: 100%; }
 /* === Theme curtain (day/night transition) === */
 #theme-curtain {
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
+  inset: 0;
   z-index: 99999;
   pointer-events: none;
   overflow: visible;
@@ -163,6 +163,162 @@ button { cursor: pointer; background: none; border: none; font: inherit; color: 
 input { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: var(--radius-sm); }
 ::selection { background: oklch(from var(--color-primary) l c h / 0.25); }
+
+/* === Toggle Switch === */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 26px;
+  flex-shrink: 0;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(10,10,10,0.18);
+  border-radius: 26px;
+  transition: background 180ms ease;
+}
+[data-theme="dark"] .toggle-slider {
+  background: rgba(255,255,255,0.18);
+}
+.toggle-slider::before {
+  content: "";
+  position: absolute;
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+}
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--color-primary);
+}
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(18px);
+  background: #0a0a0a;
+}
+.toggle-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #0a0a0a;
+  user-select: none;
+  cursor: pointer;
+}
+[data-theme="dark"] .toggle-label {
+  color: var(--color-text);
+}
+
+/* === Estimate button === */
+.estimate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  margin-top: 6px;
+  border-radius: 8px;
+  background: var(--color-primary-highlight);
+  color: var(--color-primary-active);
+  font-size: 0.70rem;
+  font-weight: 700;
+  transition: background 180ms ease, transform 180ms ease;
+}
+.estimate-btn:hover {
+  background: var(--color-primary);
+  color: #0a0a0a;
+  transform: translateY(-1px);
+}
+.estimate-btn:active {
+  transform: scale(0.97);
+}
+.estimate-btn[disabled] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.estimate-reasoning {
+  margin-top: 4px;
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  line-height: 1.35;
+}
+
+/* === Flashcard image === */
+.fc-image {
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  border-radius: 8px;
+  margin-top: 10px;
+  background: var(--color-surface-2);
+}
+.fc-image-credit {
+  font-size: 0.58rem;
+  color: var(--color-text-faint);
+  margin-top: 3px;
+  text-align: right;
+}
+.fc-image-credit a {
+  color: var(--color-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* === Generated card with image === */
+.generated-card-image {
+  width: 100%;
+  max-height: 140px;
+  object-fit: contain;
+  border-radius: 7px;
+  margin-top: 7px;
+  background: var(--color-surface-2);
+}
+.generated-image-credit {
+  font-size: 0.56rem;
+  color: var(--color-text-faint);
+  margin-top: 2px;
+  text-align: right;
+}
+.generated-image-credit a {
+  color: var(--color-text-muted);
+  text-decoration: underline;
+}
+
+/* === Quiz card image === */
+.quiz-card-image {
+  width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 8px;
+  margin-top: 10px;
+  background: var(--color-surface-2);
+}
+.quiz-image-credit {
+  font-size: 0.58rem;
+  color: var(--color-text-faint);
+  margin-top: 3px;
+  text-align: right;
+}
+.quiz-image-credit a {
+  color: var(--color-text-muted);
+  text-decoration: underline;
+}
 /* ============================================================
    FLOWCARDS PRODUCT SYSTEM — internal views
    ============================================================ */
@@ -4272,6 +4428,13 @@ body:not(:has(#view-landing.active)) .flow-progress-strip {
               <button class="prompt-chip" type="button" onclick="useStudioPrompt('Create beginner Python flashcards about variables, conditionals, loops, functions, and lists.')">Python basics</button>
               <button class="prompt-chip" type="button" onclick="useStudioPrompt('Teach the major causes and effects of the Industrial Revolution for a world history course.')">World history</button>
             </div>
+            <div class="toggle-row">
+              <label class="toggle-switch" title="When enabled, AI will search Wikimedia Commons and place a relevant image beside each flashcard.">
+                <input type="checkbox" id="studioImageToggle" onchange="syncImageToggle('studioImageToggle', this)">
+                <span class="toggle-slider"></span>
+              </label>
+              <label class="toggle-label" for="studioImageToggle">Images <span style="font-weight:400;font-size:0.68rem;color:var(--color-text-muted)">— search &amp; attach visuals</span></label>
+            </div>
             <div class="studio-row">
               <label class="studio-field">
                 <span class="studio-field-label">Deck name</span>
@@ -4282,6 +4445,10 @@ body:not(:has(#view-landing.active)) .flow-progress-strip {
                 <input class="studio-input" id="studioTopicCount" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 20" title="Enter any positive whole number" required>
               </label>
             </div>
+            <button class="estimate-btn" id="studioTopicEstimateBtn" type="button" onclick="autoEstimateCount('topic')" title="Ask AI how many flashcards cover this topic comprehensively">
+              <i data-lucide="calculator" width="13" height="13"></i> Auto-estimate
+            </button>
+            <p class="estimate-reasoning" id="studioTopicEstimateReasoning" style="display:none"></p>
             <button class="studio-generate" type="button" data-generate-button onclick="generateStudioDeck('topic')">
               <i data-lucide="sparkles" width="17" height="17"></i>
               Generate flashcards
@@ -4311,6 +4478,13 @@ body:not(:has(#view-landing.active)) .flow-progress-strip {
                 <i data-lucide="x" width="16" height="16"></i>
               </button>
             </div>
+            <div class="toggle-row" style="margin-top:14px">
+              <label class="toggle-switch" title="When enabled, AI will search Wikimedia Commons and place a relevant image beside each flashcard.">
+                <input type="checkbox" id="studioFileImageToggle" onchange="syncImageToggle('studioImageToggle', this)">
+                <span class="toggle-slider"></span>
+              </label>
+              <label class="toggle-label" for="studioFileImageToggle">Images <span style="font-weight:400;font-size:0.68rem;color:var(--color-text-muted)">— search &amp; attach visuals</span></label>
+            </div>
             <div class="studio-row" style="margin-top:17px">
               <label class="studio-field">
                 <span class="studio-field-label">Deck name</span>
@@ -4321,6 +4495,10 @@ body:not(:has(#view-landing.active)) .flow-progress-strip {
                 <input class="studio-input" id="studioFileCount" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 20" title="Enter any positive whole number" required>
               </label>
             </div>
+            <button class="estimate-btn" id="studioFileEstimateBtn" type="button" onclick="autoEstimateCount('file')" title="Ask AI how many flashcards cover this material comprehensively">
+              <i data-lucide="calculator" width="13" height="13"></i> Auto-estimate
+            </button>
+            <p class="estimate-reasoning" id="studioFileEstimateReasoning" style="display:none"></p>
             <button class="studio-generate" type="button" data-generate-button onclick="generateStudioDeck('file')">
               <i data-lucide="wand-sparkles" width="17" height="17"></i>
               Summarize and create cards
@@ -4339,6 +4517,13 @@ body:not(:has(#view-landing.active)) .flow-progress-strip {
               </span>
               <textarea class="studio-textarea" id="studioNotesText" placeholder="Paste at least a few sentences of notes here..." oninput="updateStudioNotesCount()"></textarea>
             </label>
+            <div class="toggle-row">
+              <label class="toggle-switch" title="When enabled, AI will search Wikimedia Commons and place a relevant image beside each flashcard.">
+                <input type="checkbox" id="studioNotesImageToggle" onchange="syncImageToggle('studioImageToggle', this)">
+                <span class="toggle-slider"></span>
+              </label>
+              <label class="toggle-label" for="studioNotesImageToggle">Images <span style="font-weight:400;font-size:0.68rem;color:var(--color-text-muted)">— search &amp; attach visuals</span></label>
+            </div>
             <div class="studio-row">
               <label class="studio-field">
                 <span class="studio-field-label">Deck name</span>
@@ -4349,6 +4534,10 @@ body:not(:has(#view-landing.active)) .flow-progress-strip {
                 <input class="studio-input" id="studioNotesCardCount" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 20" title="Enter any positive whole number" required>
               </label>
             </div>
+            <button class="estimate-btn" id="studioNotesEstimateBtn" type="button" onclick="autoEstimateCount('notes')" title="Ask AI how many flashcards cover this material comprehensively">
+              <i data-lucide="calculator" width="13" height="13"></i> Auto-estimate
+            </button>
+            <p class="estimate-reasoning" id="studioNotesEstimateReasoning" style="display:none"></p>
             <button class="studio-generate" type="button" data-generate-button onclick="generateStudioDeck('notes')">
               <i data-lucide="list-checks" width="17" height="17"></i>
               Extract knowledge and cards
@@ -4502,7 +4691,7 @@ body:not(:has(#view-landing.active)) .flow-progress-strip {
 // ============================================================
 // DATA MODEL & INITIAL DECKS
 // ============================================================
-/** @typedef {{ id:string, word:string, translation:string, partOfSpeech?:string, exampleSentence?:string, deckId:string }} Flashcard */
+/** @typedef {{ id:string, word:string, translation:string, partOfSpeech?:string, exampleSentence?:string, image?:{url:string,sourceUrl:string,alt:string,credit:string}|null, deckId:string }} Flashcard */
 /** @typedef {{ id:string, name:string, description:string, emoji:string }} Deck */
 /** @typedef {{ [cardId:string]: { status:'known'|'fuzzy'|'unknown'|'new', reviewCount:number, lastReview:number, nextReview:number, errorCount:number } }} ProgressMap */
 
@@ -5679,6 +5868,8 @@ const studioState = {
   aiStatus: 'checking',
   aiMessage: 'Checking the AI service…',
   healthCheckPromise: null,
+  includeImages: false,
+  estimateInFlight: false,
 };
 
 function studioWait(ms) {
@@ -6105,6 +6296,7 @@ async function requestStudioGeneration(payload) {
     const cards = Array.isArray(result.cards) ? result.cards.map(card => ({
       question: String(card.question || card.front || '').trim(),
       answer: String(card.answer || card.back || '').trim(),
+      image: card.image && card.image.url ? card.image : null,
     })).filter(card => card.question && card.answer) : [];
     if (!cards.length) throw new Error('The AI response did not include usable flashcards.');
     return {
@@ -6193,6 +6385,7 @@ async function checkStudioAIHealth(force = false) {
 }
 
 function studioPayload(mode) {
+  const includeImages = document.getElementById('studioImageToggle')?.checked ?? studioState.includeImages;
   if (mode === 'topic') {
     const prompt = document.getElementById('studioTopicPrompt')?.value.trim() || '';
     const deckName = document.getElementById('studioTopicDeckName')?.value.trim() || studioTitleFromPrompt(prompt);
@@ -6202,6 +6395,7 @@ function studioPayload(mode) {
       sourceText: '',
       deckName,
       count: Number(document.getElementById('studioTopicCount')?.value),
+      includeImages,
     };
   }
   if (mode === 'file') {
@@ -6211,6 +6405,7 @@ function studioPayload(mode) {
       sourceText: studioState.fileText,
       deckName: document.getElementById('studioFileDeckName')?.value.trim() || 'Uploaded Material',
       count: Number(document.getElementById('studioFileCount')?.value),
+      includeImages,
     };
   }
   return {
@@ -6219,6 +6414,7 @@ function studioPayload(mode) {
     sourceText: document.getElementById('studioNotesText')?.value.trim() || '',
     deckName: document.getElementById('studioNotesDeckName')?.value.trim() || 'Notes Review',
     count: Number(document.getElementById('studioNotesCardCount')?.value),
+    includeImages,
   };
 }
 
@@ -6322,6 +6518,142 @@ async function generateStudioDeck(mode) {
   }
 }
 
+function syncImageToggle(masterId, slaveCheckbox) {
+  // Keep all image toggles across panels in sync.
+  studioState.includeImages = slaveCheckbox.checked;
+  // Sync all three toggles
+  ['studioImageToggle', 'studioFileImageToggle', 'studioNotesImageToggle'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.checked = slaveCheckbox.checked;
+  });
+}
+
+async function autoEstimateCount(mode) {
+  // Estimate the number of flashcards needed for the given mode.
+  // Tries the backend /api/estimate endpoint; falls back to a heuristic.
+  if (studioState.estimateInFlight) return;
+  studioState.estimateInFlight = true;
+
+  const btnId = `studio${mode.charAt(0).toUpperCase() + mode.slice(1)}EstimateBtn`;
+  const reasoningId = `studio${mode.charAt(0).toUpperCase() + mode.slice(1)}EstimateReasoning`;
+  const btn = document.getElementById(btnId);
+  const reasoning = document.getElementById(reasoningId);
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader-2" width="13" height="13"></i> Estimating...';
+    lucide.createIcons();
+  }
+
+  let material = '';
+  let countField;
+  if (mode === 'topic') {
+    material = document.getElementById('studioTopicPrompt')?.value.trim() || '';
+    countField = document.getElementById('studioTopicCount');
+  } else if (mode === 'file') {
+    material = studioState.fileText || '';
+    countField = document.getElementById('studioFileCount');
+  } else {
+    material = document.getElementById('studioNotesText')?.value.trim() || '';
+    countField = document.getElementById('studioNotesCardCount');
+  }
+
+  if (material.length < 8) {
+    if (reasoning) { reasoning.style.display = 'block'; reasoning.textContent = 'Please enter more detail about the topic first.'; }
+    resetEstimateBtn(btn, btnId);
+    studioState.estimateInFlight = false;
+    return;
+  }
+
+  // Try backend estimate endpoint
+  const endpoint = (window.FLOWCARDS_AI_ENDPOINT || '').replace(/\/generate\/?$/, '/estimate');
+  let estimated = null;
+  let reasoningText = '';
+
+  if (endpoint && studioState.aiStatus === 'ready') {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: material, sourceText: material }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (resp.ok) {
+        const data = await resp.json();
+        estimated = data.estimatedCount;
+        reasoningText = data.reasoning || '';
+      }
+    } catch (_) {
+      // Fall through to heuristic
+    }
+  }
+
+  // Heuristic fallback
+  if (estimated === null) {
+    const wordCount = material.split(/\s+/).filter(Boolean).length;
+    if (wordCount < 30) {
+      estimated = Math.max(5, Math.round(wordCount * 0.8));
+    } else if (wordCount < 200) {
+      estimated = Math.round(15 + (wordCount - 30) * 0.25);
+    } else if (wordCount < 1000) {
+      estimated = Math.round(55 + (wordCount - 200) * 0.12);
+    } else {
+      estimated = Math.round(150 + Math.min(50, (wordCount - 1000) * 0.03));
+    }
+    estimated = Math.max(5, Math.min(200, estimated));
+    reasoningText = `Heuristic estimate based on ~${wordCount} words of content. Connect the Flask AI backend for a smarter curriculum-aware estimate.`;
+  }
+
+  if (countField) countField.value = estimated;
+  if (reasoning) {
+    reasoning.style.display = 'block';
+    reasoning.textContent = `Recommended: ${estimated} cards. ${reasoningText}`;
+  }
+
+  resetEstimateBtn(btn, btnId);
+  studioState.estimateInFlight = false;
+}
+
+function resetEstimateBtn(btn, _btnId) {
+  if (!btn) return;
+  btn.disabled = false;
+  btn.innerHTML = '<i data-lucide="calculator" width="13" height="13"></i> Auto-estimate';
+  lucide.createIcons();
+}
+
+function buildImageHTML(image) {
+  if (!image || !image.url) return '';
+  return `
+    <img class="fc-image" src="${escapeHTML(image.url)}" alt="${escapeHTML(image.alt || '')}" loading="lazy">
+    <div class="fc-image-credit">
+      <a href="${escapeHTML(image.sourceUrl || '#')}" target="_blank" rel="noopener">${escapeHTML(image.credit || 'Wikimedia Commons')}</a>
+    </div>
+  `;
+}
+
+function buildGeneratedImageHTML(image) {
+  if (!image || !image.url) return '';
+  return `
+    <img class="generated-card-image" src="${escapeHTML(image.url)}" alt="${escapeHTML(image.alt || '')}" loading="lazy">
+    <div class="generated-image-credit">
+      <a href="${escapeHTML(image.sourceUrl || '#')}" target="_blank" rel="noopener">${escapeHTML(image.credit || 'Wikimedia Commons')}</a>
+    </div>
+  `;
+}
+
+function buildQuizImageHTML(image) {
+  if (!image || !image.url) return '';
+  return `
+    <img class="quiz-card-image" src="${escapeHTML(image.url)}" alt="${escapeHTML(image.alt || '')}" loading="lazy">
+    <div class="quiz-image-credit">
+      <a href="${escapeHTML(image.sourceUrl || '#')}" target="_blank" rel="noopener">${escapeHTML(image.credit || 'Wikimedia Commons')}</a>
+    </div>
+  `;
+}
+
 function renderStudioResults() {
   const empty = document.getElementById('studioEmptyState');
   const results = document.getElementById('studioResults');
@@ -6341,9 +6673,10 @@ function renderStudioResults() {
     </div>
   `).join('');
   cards.innerHTML = studioState.generatedCards.map((card, index) => `
-    <article class="generated-card">
+    <article class="generated-card${card.image ? ' with-image' : ''}">
       <div class="generated-question">${index + 1}. ${escapeHTML(card.question)}</div>
       <div class="generated-answer">${escapeHTML(card.answer)}</div>
+      ${buildGeneratedImageHTML(card.image)}
     </article>
   `).join('');
   results.classList.add('visible');
@@ -6391,6 +6724,7 @@ function saveStudioCards() {
       translation: card.answer,
       partOfSpeech: 'Knowledge point',
       exampleSentence: '',
+      image: card.image || null,
       deckId,
     };
     USER.customCards.push(item);
@@ -6949,6 +7283,7 @@ function buildCardHTML(card, i, total) {
               <span class="fc-status-dot ${p.status === 'new' ? '' : p.status}" title="${p.status}"></span>
             </div>
             <div class="fc-word">${card.word}</div>
+            ${buildImageHTML(card.image)}
             <div class="fc-tap-hint">
               <i data-lucide="rotate-cw" width="12" height="12"></i>
               <span>tap or press Enter to reveal</span>
@@ -7189,6 +7524,7 @@ function renderQuizQuestion() {
     <div class="quiz-card">
       <div class="quiz-question-label">${isWordToTranslation ? 'What does this word mean?' : 'Which word matches this definition?'}</div>
       <div class="quiz-question">${questionText}</div>
+      ${buildQuizImageHTML(q.image)}
       <div class="quiz-choices">
         ${choices.map((c, i) => {
           const choiceText = isWordToTranslation ? c.translation : c.word;
