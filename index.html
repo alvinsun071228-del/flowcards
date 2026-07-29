@@ -7422,17 +7422,22 @@ function initFloatingHeader() {
   let frame = 0;
   let idleTimer = 0;
   let suppressNextClick = false;
+  let expandedFromCompactAt = -Infinity;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function setHeaderState(nextCompact, force = false, reason = 'programmatic') {
     if (!force && compact === nextCompact) return;
+    const wasCompact = compact;
     compact = nextCompact;
+    if (wasCompact && !nextCompact && reason === 'intent') {
+      expandedFromCompactAt = performance.now();
+    }
     header.dataset.scrollState = compact ? 'compact' : 'expanded';
     header.dataset.scrollTrigger = reason;
     const mobile = window.innerWidth <= 760;
-    const compactWidth = Math.min(header.offsetWidth - 24, mobile ? 132 : 148);
+    const compactWidth = Math.min(header.offsetWidth - 24, mobile ? 116 : 128);
     const horizontalInset = Math.max(0, (header.offsetWidth - compactWidth) / 2);
-    const verticalInset = mobile ? 8 : 12;
+    const verticalInset = mobile ? 13 : 18;
     const logoShift = (header.offsetWidth / 2) - (logo.offsetLeft + logo.offsetWidth / 2);
     const headerVars = compact
       ? {
@@ -7445,7 +7450,9 @@ function initFloatingHeader() {
           y: 0,
           opacity: 1,
         };
-    const logoVars = compact ? { x: logoShift } : { x: 0 };
+    const logoVars = compact
+      ? { x: logoShift, scale: mobile ? 0.82 : 0.86 }
+      : { x: 0, scale: 1 };
     const actionVars = compact
       ? { autoAlpha: 0, x: 10, pointerEvents: 'none' }
       : { autoAlpha: 1, x: 0, pointerEvents: 'auto' };
@@ -7503,8 +7510,10 @@ function initFloatingHeader() {
   }
 
   function onHeaderClick(event) {
-    if (!suppressNextClick) return;
+    const justExpanded = performance.now() - expandedFromCompactAt < 600;
+    if (!suppressNextClick && !justExpanded) return;
     suppressNextClick = false;
+    expandedFromCompactAt = -Infinity;
     event.preventDefault();
     event.stopPropagation();
   }
