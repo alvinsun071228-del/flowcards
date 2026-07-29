@@ -7413,11 +7413,15 @@ function initFloatingHeader() {
   if (floatingHeaderCleanup) floatingHeaderCleanup();
   const header = document.querySelector('.site-header');
   if (!header || !window.gsap) return;
+  const logo = header.querySelector('.site-logo');
+  const actions = header.querySelector('.header-actions');
+  if (!logo || !actions) return;
 
   let compact = false;
   let lastY = Math.max(0, window.scrollY);
   let frame = 0;
   let idleTimer = 0;
+  let suppressNextClick = false;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function setHeaderState(nextCompact, force = false, reason = 'programmatic') {
@@ -7426,18 +7430,54 @@ function initFloatingHeader() {
     header.dataset.scrollState = compact ? 'compact' : 'expanded';
     header.dataset.scrollTrigger = reason;
     const mobile = window.innerWidth <= 760;
-    const vars = compact
-      ? { scale: mobile ? 0.62 : 0.56, y: -4, opacity: 0.88 }
-      : { scaleX: 1, scaleY: 1, y: 0, opacity: 1 };
+    const compactWidth = Math.min(header.offsetWidth - 24, mobile ? 132 : 148);
+    const horizontalInset = Math.max(0, (header.offsetWidth - compactWidth) / 2);
+    const verticalInset = mobile ? 8 : 12;
+    const logoShift = (header.offsetWidth / 2) - (logo.offsetLeft + logo.offsetWidth / 2);
+    const headerVars = compact
+      ? {
+          clipPath: `inset(${verticalInset}px ${horizontalInset}px ${verticalInset}px ${horizontalInset}px round 999px)`,
+          y: -2,
+          opacity: 0.94,
+        }
+      : {
+          clipPath: 'inset(0px 0px 0px 0px round 24px)',
+          y: 0,
+          opacity: 1,
+        };
+    const logoVars = compact ? { x: logoShift } : { x: 0 };
+    const actionVars = compact
+      ? { autoAlpha: 0, x: 10, pointerEvents: 'none' }
+      : { autoAlpha: 1, x: 0, pointerEvents: 'auto' };
 
     if (reduceMotion) {
-      gsap.set(header, vars);
+      gsap.set(header, headerVars);
+      gsap.set(logo, logoVars);
+      gsap.set(actions, actionVars);
+      if (!compact) gsap.set(header, { clearProps: 'clipPath' });
       return;
     }
     gsap.to(header, {
-      ...vars,
-      duration: compact ? 0.28 : 0.42,
+      ...headerVars,
+      duration: compact ? 0.30 : 0.42,
       ease: compact ? 'power2.out' : 'power3.out',
+      overwrite: 'auto',
+      onComplete: () => {
+        if (!nextCompact && compact === nextCompact) {
+          gsap.set(header, { clearProps: 'clipPath' });
+        }
+      },
+    });
+    gsap.to(logo, {
+      ...logoVars,
+      duration: compact ? 0.30 : 0.42,
+      ease: compact ? 'power2.out' : 'power3.out',
+      overwrite: 'auto',
+    });
+    gsap.to(actions, {
+      ...actionVars,
+      duration: compact ? 0.16 : 0.28,
+      ease: 'power2.out',
       overwrite: 'auto',
     });
   }
@@ -7450,6 +7490,23 @@ function initFloatingHeader() {
   function scheduleIdleExpand() {
     clearTimeout(idleTimer);
     idleTimer = window.setTimeout(() => setHeaderState(false, false, 'idle'), 1200);
+  }
+
+  function onPointerDown(event) {
+    const wasCompact = compact;
+    expandHeader();
+    if (wasCompact) {
+      suppressNextClick = true;
+      event.preventDefault();
+      window.setTimeout(() => { suppressNextClick = false; }, 500);
+    }
+  }
+
+  function onHeaderClick(event) {
+    if (!suppressNextClick) return;
+    suppressNextClick = false;
+    event.preventDefault();
+    event.stopPropagation();
   }
 
   function updateFromScroll() {
@@ -7477,7 +7534,8 @@ function initFloatingHeader() {
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', onResize, { passive: true });
   header.addEventListener('pointerenter', expandHeader);
-  header.addEventListener('pointerdown', expandHeader);
+  header.addEventListener('pointerdown', onPointerDown);
+  header.addEventListener('click', onHeaderClick);
   header.addEventListener('focusin', expandHeader);
   header.dataset.scrollState = 'expanded';
 
@@ -7487,9 +7545,10 @@ function initFloatingHeader() {
     window.removeEventListener('scroll', onScroll);
     window.removeEventListener('resize', onResize);
     header.removeEventListener('pointerenter', expandHeader);
-    header.removeEventListener('pointerdown', expandHeader);
+    header.removeEventListener('pointerdown', onPointerDown);
+    header.removeEventListener('click', onHeaderClick);
     header.removeEventListener('focusin', expandHeader);
-    gsap.set(header, { clearProps: 'transform' });
+    gsap.set([header, logo, actions], { clearProps: 'all' });
   };
 }
 
