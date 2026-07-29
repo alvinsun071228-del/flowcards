@@ -7427,8 +7427,8 @@ function initFloatingHeader() {
     header.dataset.scrollTrigger = reason;
     const mobile = window.innerWidth <= 760;
     const vars = compact
-      ? { scaleX: mobile ? 0.78 : 0.72, scaleY: 0.78, y: -2 }
-      : { scaleX: 1, scaleY: 1, y: 0 };
+      ? { scale: mobile ? 0.62 : 0.56, y: -4, opacity: 0.88 }
+      : { scaleX: 1, scaleY: 1, y: 0, opacity: 1 };
 
     if (reduceMotion) {
       gsap.set(header, vars);
