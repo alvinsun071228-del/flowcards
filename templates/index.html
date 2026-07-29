@@ -1388,6 +1388,23 @@ body:not(:has(#view-landing.active)) .toast { color: var(--color-text); backgrou
   backdrop-filter: none;
 }
 .modal-backdrop.show { display: flex; animation: fadeIn 150ms ease; }
+.modal-backdrop::before,
+.modal-backdrop::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: calc(env(safe-area-inset-top, 0px) + 2px);
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+.modal-backdrop::before {
+  top: calc(-1 * env(safe-area-inset-top, 0px));
+}
+.modal-backdrop::after {
+  bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
+  height: calc(env(safe-area-inset-bottom, 0px) + 2px);
+}
 @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
 .modal {
   background: var(--color-surface);
