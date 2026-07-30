@@ -118,7 +118,7 @@ class FlowCardsApiTests(unittest.TestCase):
         self.assertEqual(sent_request["json"]["thinking"], {"type": "disabled"})
         self.assertNotIn("reasoning_effort", sent_request["json"])
         self.assertNotIn("temperature", sent_request["json"])
-        self.assertEqual(sent_request["json"]["max_tokens"], 4_000)
+        self.assertEqual(sent_request["json"]["max_tokens"], 3_000)
         self.assertNotIn("test-key", str(sent_request["json"]))
         system_prompt = sent_request["json"]["messages"][0]["content"]
         self.assertIn("genuine, grammatically complete question", system_prompt)
