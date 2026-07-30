@@ -25,7 +25,7 @@ UPSTREAM_ATTEMPT_TIMEOUT_SECONDS = 40
 UPSTREAM_DEADLINE_SECONDS = 50
 MAX_SOURCE_CHARACTERS = 60_000
 MAX_PROMPT_CHARACTERS = 4_000
-MAX_CARD_COUNT = 200
+MAX_CARD_COUNT = 120
 MAX_IMAGE_CARDS = 60
 IMAGE_SEARCH_TIMEOUT_SECONDS = 8
 IMAGE_SEARCH_WORKERS = 6
@@ -454,7 +454,7 @@ def generate():
         ],
         "thinking": {"type": "enabled" if use_thinking else "disabled"},
         "response_format": {"type": "json_object"},
-        "max_tokens": min(16_000, max(2_400, payload["count"] * 160)),
+        "max_tokens": min(12_000, max(2_400, payload["count"] * 120)),
         "stream": False,
     }
     if use_thinking:
