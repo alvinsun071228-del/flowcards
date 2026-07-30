@@ -6390,11 +6390,19 @@ function localSourceGeneration(source, count, deckName) {
 async function requestStudioGeneration(payload) {
   const endpoint = window.FLOWCARDS_AI_ENDPOINT;
   if (endpoint && studioState.aiStatus === 'ready') {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 55000);
+    let response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
     let result = null;
     try {
       result = await response.json();
@@ -6404,7 +6412,7 @@ async function requestStudioGeneration(payload) {
     if (!response.ok) {
       throw new Error(result?.error || `AI request failed with status ${response.status}.`);
     }
-    if (!result) throw new Error('The AI server returned an unreadable response.');
+    if (!result) throw new Error('The AI server returned an unreadable response. Try again in a moment.');
     const cards = Array.isArray(result.cards) ? result.cards.map(card => ({
       question: String(card.question || card.front || '').trim(),
       answer: String(card.answer || card.back || '').trim(),
@@ -6462,36 +6470,41 @@ async function checkStudioAIHealth(force = false) {
     );
     return false;
   }
-  setStudioAIStatus('checking', 'Checking the Flask AI service…', 'Checking AI…');
+  setStudioAIStatus('checking', 'Connecting to AI service…', 'Connecting…');
   studioState.healthCheckPromise = (async () => {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
-      let response;
+    for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        response = await fetch(healthEndpoint, {
-          cache: 'no-store',
-          headers: { Accept: 'application/json' },
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(timeout);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 12000);
+        let response;
+        try {
+          response = await fetch(healthEndpoint, {
+            cache: 'no-store',
+            headers: { Accept: 'application/json' },
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeout);
+        }
+        const health = response.ok ? await response.json() : null;
+        if (!health?.ok || !health?.configured) throw new Error('DeepSeek is not configured.');
+        const model = String(health.model || 'DeepSeek').replace('deepseek-', 'DeepSeek ');
+        setStudioAIStatus('ready', `AI ready: ${model}`, model);
+        return true;
+      } catch (_error) {
+        if (attempt < 3) {
+          setStudioAIStatus('checking', `Retrying (attempt ${attempt + 1}/3)…`, 'Connecting…');
+          await new Promise(r => setTimeout(r, 2000));
+        } else {
+          setStudioAIStatus(
+            'offline',
+            'AI is unavailable. The server may be starting up — please retry in a moment.',
+            'AI offline'
+          );
+        }
       }
-      const health = response.ok ? await response.json() : null;
-      if (!health?.ok || !health?.configured) throw new Error('DeepSeek is not configured.');
-      const model = String(health.model || 'DeepSeek').replace('deepseek-', 'DeepSeek ');
-      setStudioAIStatus('ready', `AI ready: ${model}`, model);
-      return true;
-    } catch (_error) {
-      setStudioAIStatus(
-        'offline',
-        'AI is unavailable. Start Flask and configure DEEPSEEK_API_KEY, then reload this page.',
-        'AI offline'
-      );
-      return false;
-    } finally {
-      studioState.healthCheckPromise = null;
     }
+    return false;
   })();
   return studioState.healthCheckPromise;
 }
@@ -6620,7 +6633,10 @@ async function generateStudioDeck(mode) {
     renderStudioResults();
   } catch (error) {
     document.getElementById('studioEmptyState')?.style.removeProperty('display');
-    showToast(error.message || 'Cards could not be generated.', 'error');
+    const msg = error.name === 'AbortError'
+      ? 'The request timed out. The server may be starting up — please try again.'
+      : (error.message || 'Cards could not be generated.');
+    showToast(msg, 'error');
   } finally {
     studioState.requestInFlight = false;
     studioState.processingTimeline?.kill();
