@@ -118,7 +118,7 @@ class FlowCardsApiTests(unittest.TestCase):
         self.assertEqual(sent_request["json"]["thinking"], {"type": "disabled"})
         self.assertNotIn("reasoning_effort", sent_request["json"])
         self.assertNotIn("temperature", sent_request["json"])
-        self.assertEqual(sent_request["json"]["max_tokens"], 4_500)
+        self.assertEqual(sent_request["json"]["max_tokens"], 4_000)
         self.assertNotIn("test-key", str(sent_request["json"]))
         system_prompt = sent_request["json"]["messages"][0]["content"]
         self.assertIn("genuine, grammatically complete question", system_prompt)
@@ -181,7 +181,7 @@ class FlowCardsApiTests(unittest.TestCase):
         mock_sleep.assert_called_once()
 
     @patch("app.requests.post")
-    def test_uses_thinking_for_large_decks(self, mock_post):
+    def test_uses_flash_for_large_decks(self, mock_post):
         deepseek_response = Mock()
         deepseek_response.ok = True
         deepseek_response.status_code = 200
@@ -209,15 +209,19 @@ class FlowCardsApiTests(unittest.TestCase):
                 "prompt": "Create a comprehensive calculus review deck.",
                 "sourceText": "",
                 "deckName": "Calculus",
-                "count": 90,
+                "count": 50,
             },
         )
 
         self.assertEqual(response.status_code, 200)
         sent_payload = mock_post.call_args.kwargs["json"]
-        self.assertEqual(sent_payload["thinking"], {"type": "enabled"})
-        self.assertEqual(sent_payload["reasoning_effort"], "medium")
-        self.assertEqual(response.headers["X-FlowCards-AI-Thinking"], "enabled")
+        # Large decks (>30) use Flash model
+        self.assertEqual(sent_payload["model"], "deepseek-v4-flash")
+        # Flash path disables thinking
+        self.assertEqual(sent_payload["thinking"], {"type": "disabled"})
+        self.assertNotIn("reasoning_effort", sent_payload)
+        self.assertEqual(response.headers["X-FlowCards-AI-Model"], "deepseek-v4-flash")
+        self.assertEqual(response.headers["X-FlowCards-AI-Thinking"], "disabled")
 
     def test_filters_trivia_statements_and_duplicate_questions(self):
         result = parse_deepseek_result(

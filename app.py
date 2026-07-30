@@ -437,12 +437,15 @@ def generate():
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
+    # Large decks use the faster Flash model to stay within Vercel 60s limit
+    use_flash = payload["count"] > 30
     use_thinking = (
-        payload["count"] > 80
+        not use_flash
+        and (payload["count"] > 80
         or (
             payload["mode"] in {"file", "notes"}
             and len(payload["sourceText"]) > 20_000
-        )
+        ))
     )
     deepseek_payload = {
         "messages": [
@@ -451,15 +454,18 @@ def generate():
         ],
         "thinking": {"type": "enabled" if use_thinking else "disabled"},
         "response_format": {"type": "json_object"},
-        "max_tokens": min(24_000, max(2_400, payload["count"] * 180)),
+        "max_tokens": min(16_000, max(2_400, payload["count"] * 160)),
         "stream": False,
     }
     if use_thinking:
         deepseek_payload["reasoning_effort"] = "medium"
 
-    models = [DEEPSEEK_MODEL]
-    if DEEPSEEK_FALLBACK_MODEL and DEEPSEEK_FALLBACK_MODEL != DEEPSEEK_MODEL:
-        models.append(DEEPSEEK_FALLBACK_MODEL)
+    if use_flash and DEEPSEEK_FALLBACK_MODEL:
+        models = [DEEPSEEK_FALLBACK_MODEL]
+    else:
+        models = [DEEPSEEK_MODEL]
+        if DEEPSEEK_FALLBACK_MODEL and DEEPSEEK_FALLBACK_MODEL != DEEPSEEK_MODEL:
+            models.append(DEEPSEEK_FALLBACK_MODEL)
 
     started_at = time.monotonic()
     deepseek_response = None
