@@ -21,8 +21,8 @@ DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions"
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
 DEEPSEEK_FALLBACK_MODEL = os.getenv("DEEPSEEK_FALLBACK_MODEL", "deepseek-v4-flash")
 REQUEST_TIMEOUT_SECONDS = 60
-UPSTREAM_ATTEMPT_TIMEOUT_SECONDS = 45
-UPSTREAM_DEADLINE_SECONDS = 55
+UPSTREAM_ATTEMPT_TIMEOUT_SECONDS = 40
+UPSTREAM_DEADLINE_SECONDS = 50
 MAX_SOURCE_CHARACTERS = 60_000
 MAX_PROMPT_CHARACTERS = 4_000
 MAX_CARD_COUNT = 200
@@ -438,10 +438,10 @@ def generate():
         return jsonify({"error": str(exc)}), 400
 
     use_thinking = (
-        payload["count"] > 40
+        payload["count"] > 80
         or (
             payload["mode"] in {"file", "notes"}
-            and len(payload["sourceText"]) > 15_000
+            and len(payload["sourceText"]) > 20_000
         )
     )
     deepseek_payload = {
@@ -451,11 +451,11 @@ def generate():
         ],
         "thinking": {"type": "enabled" if use_thinking else "disabled"},
         "response_format": {"type": "json_object"},
-        "max_tokens": min(48_000, max(2_400, payload["count"] * 240)),
+        "max_tokens": min(24_000, max(2_400, payload["count"] * 180)),
         "stream": False,
     }
     if use_thinking:
-        deepseek_payload["reasoning_effort"] = "high"
+        deepseek_payload["reasoning_effort"] = "medium"
 
     models = [DEEPSEEK_MODEL]
     if DEEPSEEK_FALLBACK_MODEL and DEEPSEEK_FALLBACK_MODEL != DEEPSEEK_MODEL:

@@ -118,7 +118,7 @@ class FlowCardsApiTests(unittest.TestCase):
         self.assertEqual(sent_request["json"]["thinking"], {"type": "disabled"})
         self.assertNotIn("reasoning_effort", sent_request["json"])
         self.assertNotIn("temperature", sent_request["json"])
-        self.assertEqual(sent_request["json"]["max_tokens"], 6_000)
+        self.assertEqual(sent_request["json"]["max_tokens"], 4_500)
         self.assertNotIn("test-key", str(sent_request["json"]))
         system_prompt = sent_request["json"]["messages"][0]["content"]
         self.assertIn("genuine, grammatically complete question", system_prompt)
@@ -209,14 +209,14 @@ class FlowCardsApiTests(unittest.TestCase):
                 "prompt": "Create a comprehensive calculus review deck.",
                 "sourceText": "",
                 "deckName": "Calculus",
-                "count": 50,
+                "count": 90,
             },
         )
 
         self.assertEqual(response.status_code, 200)
         sent_payload = mock_post.call_args.kwargs["json"]
         self.assertEqual(sent_payload["thinking"], {"type": "enabled"})
-        self.assertEqual(sent_payload["reasoning_effort"], "high")
+        self.assertEqual(sent_payload["reasoning_effort"], "medium")
         self.assertEqual(response.headers["X-FlowCards-AI-Thinking"], "enabled")
 
     def test_filters_trivia_statements_and_duplicate_questions(self):
